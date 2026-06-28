@@ -1,0 +1,422 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		A10000000000000000000001 /* JapanTripApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000001 /* JapanTripApp.swift */; };
+		A10000000000000000000002 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000002 /* Models.swift */; };
+		A10000000000000000000003 /* TripData.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000003 /* TripData.swift */; };
+		A10000000000000000000004 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000004 /* RootView.swift */; };
+		A10000000000000000000005 /* TodayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000005 /* TodayView.swift */; };
+		A10000000000000000000006 /* ItineraryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000006 /* ItineraryView.swift */; };
+		A10000000000000000000007 /* ReservationsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000007 /* ReservationsView.swift */; };
+		A10000000000000000000008 /* ChecklistView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000008 /* ChecklistView.swift */; };
+		A10000000000000000000009 /* AuthenticationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000009 /* AuthenticationView.swift */; };
+		A10000000000000000000010 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000010 /* Assets.xcassets */; };
+		A10000000000000000000011 /* WeatherService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000011 /* WeatherService.swift */; };
+		A10000000000000000000012 /* WeatherView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000012 /* WeatherView.swift */; };
+		A10000000000000000000013 /* MobilityView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000013 /* MobilityView.swift */; };
+		A10000000000000000000014 /* FlightsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000014 /* FlightsView.swift */; };
+		A10000000000000000000015 /* PhotoJournalView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000015 /* PhotoJournalView.swift */; };
+		A10000000000000000000020 /* JapanTripTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000020 /* JapanTripTests.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		810000000000000000000001 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = E10000000000000000000000 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = E10000000000000000000001;
+			remoteInfo = JapanTrip;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		B10000000000000000000000 /* JapanTrip.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = JapanTrip.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		B10000000000000000000001 /* JapanTripApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JapanTripApp.swift; sourceTree = "<group>"; };
+		B10000000000000000000002 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
+		B10000000000000000000003 /* TripData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TripData.swift; sourceTree = "<group>"; };
+		B10000000000000000000004 /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
+		B10000000000000000000005 /* TodayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayView.swift; sourceTree = "<group>"; };
+		B10000000000000000000006 /* ItineraryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ItineraryView.swift; sourceTree = "<group>"; };
+		B10000000000000000000007 /* ReservationsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReservationsView.swift; sourceTree = "<group>"; };
+		B10000000000000000000008 /* ChecklistView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChecklistView.swift; sourceTree = "<group>"; };
+		B10000000000000000000009 /* AuthenticationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthenticationView.swift; sourceTree = "<group>"; };
+		B10000000000000000000010 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		B10000000000000000000011 /* WeatherService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeatherService.swift; sourceTree = "<group>"; };
+		B10000000000000000000012 /* WeatherView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeatherView.swift; sourceTree = "<group>"; };
+		B10000000000000000000013 /* MobilityView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobilityView.swift; sourceTree = "<group>"; };
+		B10000000000000000000014 /* FlightsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FlightsView.swift; sourceTree = "<group>"; };
+		B10000000000000000000015 /* PhotoJournalView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoJournalView.swift; sourceTree = "<group>"; };
+		B10000000000000000000020 /* JapanTripTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JapanTripTests.swift; sourceTree = "<group>"; };
+		B10000000000000000000021 /* JapanTripTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = JapanTripTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		C10000000000000000000001 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		C10000000000000000000021 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		D10000000000000000000000 = {
+			isa = PBXGroup;
+			children = (
+				D10000000000000000000001 /* JapanTrip */,
+				D10000000000000000000020 /* JapanTripTests */,
+				D10000000000000000000002 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		D10000000000000000000001 /* JapanTrip */ = {
+			isa = PBXGroup;
+			children = (
+				B10000000000000000000001 /* JapanTripApp.swift */,
+				B10000000000000000000002 /* Models.swift */,
+				B10000000000000000000003 /* TripData.swift */,
+				B10000000000000000000004 /* RootView.swift */,
+				B10000000000000000000005 /* TodayView.swift */,
+				B10000000000000000000006 /* ItineraryView.swift */,
+				B10000000000000000000007 /* ReservationsView.swift */,
+				B10000000000000000000008 /* ChecklistView.swift */,
+				B10000000000000000000009 /* AuthenticationView.swift */,
+				B10000000000000000000010 /* Assets.xcassets */,
+				B10000000000000000000011 /* WeatherService.swift */,
+				B10000000000000000000012 /* WeatherView.swift */,
+				B10000000000000000000013 /* MobilityView.swift */,
+				B10000000000000000000014 /* FlightsView.swift */,
+				B10000000000000000000015 /* PhotoJournalView.swift */,
+			);
+			path = JapanTrip;
+			sourceTree = "<group>";
+		};
+		D10000000000000000000002 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				B10000000000000000000000 /* JapanTrip.app */,
+				B10000000000000000000021 /* JapanTripTests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		D10000000000000000000020 /* JapanTripTests */ = {
+			isa = PBXGroup;
+			children = (
+				B10000000000000000000020 /* JapanTripTests.swift */,
+			);
+			path = JapanTripTests;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		E10000000000000000000001 /* JapanTrip */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = F10000000000000000000002 /* Build configuration list for PBXNativeTarget "JapanTrip" */;
+			buildPhases = (
+				C10000000000000000000003 /* Sources */,
+				C10000000000000000000001 /* Frameworks */,
+				C10000000000000000000002 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = JapanTrip;
+			productName = JapanTrip;
+			productReference = B10000000000000000000000 /* JapanTrip.app */;
+			productType = "com.apple.product-type.application";
+		};
+		E10000000000000000000020 /* JapanTripTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = F10000000000000000000020 /* Build configuration list for PBXNativeTarget "JapanTripTests" */;
+			buildPhases = (
+				C10000000000000000000020 /* Sources */,
+				C10000000000000000000021 /* Frameworks */,
+				C10000000000000000000022 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				820000000000000000000001 /* PBXTargetDependency */,
+			);
+			name = JapanTripTests;
+			productName = JapanTripTests;
+			productReference = B10000000000000000000021 /* JapanTripTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		E10000000000000000000000 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 2660;
+				LastUpgradeCheck = 2660;
+				TargetAttributes = {
+					E10000000000000000000001 = {
+						CreatedOnToolsVersion = 26.0;
+					};
+					E10000000000000000000020 = {
+						CreatedOnToolsVersion = 26.0;
+						TestTargetID = E10000000000000000000001;
+					};
+				};
+			};
+			buildConfigurationList = F10000000000000000000001 /* Build configuration list for PBXProject "JapanTrip" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = pt;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				pt,
+				Base,
+			);
+			mainGroup = D10000000000000000000000;
+			productRefGroup = D10000000000000000000002 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				E10000000000000000000001 /* JapanTrip */,
+				E10000000000000000000020 /* JapanTripTests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		C10000000000000000000002 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A10000000000000000000010 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		C10000000000000000000022 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		C10000000000000000000003 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A10000000000000000000001 /* JapanTripApp.swift in Sources */,
+				A10000000000000000000002 /* Models.swift in Sources */,
+				A10000000000000000000003 /* TripData.swift in Sources */,
+				A10000000000000000000004 /* RootView.swift in Sources */,
+				A10000000000000000000005 /* TodayView.swift in Sources */,
+				A10000000000000000000006 /* ItineraryView.swift in Sources */,
+				A10000000000000000000007 /* ReservationsView.swift in Sources */,
+				A10000000000000000000008 /* ChecklistView.swift in Sources */,
+				A10000000000000000000009 /* AuthenticationView.swift in Sources */,
+				A10000000000000000000011 /* WeatherService.swift in Sources */,
+				A10000000000000000000012 /* WeatherView.swift in Sources */,
+				A10000000000000000000013 /* MobilityView.swift in Sources */,
+				A10000000000000000000014 /* FlightsView.swift in Sources */,
+				A10000000000000000000015 /* PhotoJournalView.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		C10000000000000000000020 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A10000000000000000000020 /* JapanTripTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		820000000000000000000001 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = E10000000000000000000001 /* JapanTrip */;
+			targetProxy = 810000000000000000000001 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		F20000000000000000000001 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		F20000000000000000000002 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		F20000000000000000000003 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 6NZYY9V29Q;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "Japão 2026";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.travel";
+				INFOPLIST_KEY_NSCameraUsageDescription = "Use a câmera para registrar e guardar memórias da viagem no diário privado.";
+				INFOPLIST_KEY_NSFaceIDUsageDescription = "Use o Face ID para proteger o roteiro e as reservas da viagem.";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = UIInterfaceOrientationPortrait;
+				MARKETING_VERSION = 1.1;
+				PRODUCT_BUNDLE_IDENTIFIER = com.ruicoelho;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
+		F20000000000000000000004 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 6NZYY9V29Q;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "Japão 2026";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.travel";
+				INFOPLIST_KEY_NSCameraUsageDescription = "Use a câmera para registrar e guardar memórias da viagem no diário privado.";
+				INFOPLIST_KEY_NSFaceIDUsageDescription = "Use o Face ID para proteger o roteiro e as reservas da viagem.";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = UIInterfaceOrientationPortrait;
+				MARKETING_VERSION = 1.1;
+				PRODUCT_BUNDLE_IDENTIFIER = com.ruicoelho;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Release;
+		};
+		F20000000000000000000020 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.ruicoelho.JapanTrip2026Tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/JapanTrip.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/JapanTrip";
+				TEST_TARGET_NAME = JapanTrip;
+			};
+			name = Debug;
+		};
+		F20000000000000000000021 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.ruicoelho.JapanTrip2026Tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/JapanTrip.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/JapanTrip";
+				TEST_TARGET_NAME = JapanTrip;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		F10000000000000000000001 /* Build configuration list for PBXProject "JapanTrip" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				F20000000000000000000001 /* Debug */,
+				F20000000000000000000002 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		F10000000000000000000002 /* Build configuration list for PBXNativeTarget "JapanTrip" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				F20000000000000000000003 /* Debug */,
+				F20000000000000000000004 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		F10000000000000000000020 /* Build configuration list for PBXNativeTarget "JapanTripTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				F20000000000000000000020 /* Debug */,
+				F20000000000000000000021 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = E10000000000000000000000 /* Project object */;
+}
