@@ -30,11 +30,19 @@ struct JapanTripApp: App {
 @MainActor
 final class TripState: ObservableObject {
     @Published private(set) var completedIDs: Set<String>
+    @Published private(set) var checklistItems: [ChecklistItem]
 
     private let defaultsKey = "completedChecklistIDs"
+    private let itemsKey = "checklistItems"
 
     init() {
         completedIDs = Set(UserDefaults.standard.stringArray(forKey: defaultsKey) ?? [])
+        if let data = UserDefaults.standard.data(forKey: itemsKey),
+           let items = try? JSONDecoder().decode([ChecklistItem].self, from: data) {
+            checklistItems = items
+        } else {
+            checklistItems = TripData.checklist
+        }
     }
 
     func isCompleted(_ item: ChecklistItem) -> Bool {
@@ -48,5 +56,40 @@ final class TripState: ObservableObject {
             completedIDs.insert(item.id)
         }
         UserDefaults.standard.set(Array(completedIDs), forKey: defaultsKey)
+    }
+
+    func addChecklistItem(title: String, section: ChecklistItem.Section) {
+        let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        checklistItems.append(.init(id: UUID().uuidString, title: trimmed, section: section))
+        saveChecklist()
+    }
+
+    func updateChecklistItem(_ item: ChecklistItem, title: String, section: ChecklistItem.Section) {
+        guard let index = checklistItems.firstIndex(where: { $0.id == item.id }) else { return }
+        let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        checklistItems[index] = .init(id: item.id, title: trimmed, section: section)
+        saveChecklist()
+    }
+
+    func deleteChecklistItem(_ item: ChecklistItem) {
+        checklistItems.removeAll { $0.id == item.id }
+        completedIDs.remove(item.id)
+        UserDefaults.standard.set(Array(completedIDs), forKey: defaultsKey)
+        saveChecklist()
+    }
+
+    func restoreDefaultChecklist() {
+        checklistItems = TripData.checklist
+        completedIDs = []
+        UserDefaults.standard.set([], forKey: defaultsKey)
+        saveChecklist()
+    }
+
+    private func saveChecklist() {
+        if let data = try? JSONEncoder().encode(checklistItems) {
+            UserDefaults.standard.set(data, forKey: itemsKey)
+        }
     }
 }

@@ -30,18 +30,18 @@ final class AuthenticationManager: ObservableObject {
 
         let context = LAContext()
         context.localizedCancelTitle = "Cancelar"
-        context.localizedFallbackTitle = "Usar código"
+        context.localizedFallbackTitle = ""
         var policyError: NSError?
 
-        guard context.canEvaluatePolicy(.deviceOwnerAuthentication, error: &policyError) else {
-            errorMessage = "Configure Face ID, Touch ID ou um código neste iPhone para proteger o roteiro."
+        guard context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &policyError) else {
+            errorMessage = "Biometria indisponível. Use a senha da viagem."
             isAuthenticating = false
             return
         }
 
         do {
             let success = try await context.evaluatePolicy(
-                .deviceOwnerAuthentication,
+                .deviceOwnerAuthenticationWithBiometrics,
                 localizedReason: "Aceda ao roteiro privado da viagem ao Japão."
             )
             isAuthenticated = success
@@ -92,9 +92,9 @@ final class AuthenticationManager: ObservableObject {
     private func authenticationMessage(for code: LAError.Code) -> String {
         return switch code {
         case .authenticationFailed: "Não foi possível confirmar a identidade."
-        case .biometryLockout: "A biometria está bloqueada. Use o código do iPhone."
-        case .biometryNotEnrolled: "Configure a biometria nos Ajustes do iPhone."
-        case .passcodeNotSet: "Configure um código nos Ajustes do iPhone."
+        case .biometryLockout: "A biometria está bloqueada. Use a senha da viagem."
+        case .biometryNotEnrolled: "Biometria não configurada. Use a senha da viagem."
+        case .passcodeNotSet: "Use a senha da viagem para entrar."
         default: "Autenticação indisponível neste momento."
         }
     }
@@ -209,6 +209,9 @@ private struct AuthenticationView: View {
                 }
                 .padding(.horizontal, 28)
             }
+        }
+        .task {
+            await auth.authenticate()
         }
     }
 

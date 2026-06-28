@@ -126,7 +126,7 @@ struct PhotoJournalView: View {
             }
         }
         .background(Color(.systemGroupedBackground))
-        .navigationTitle("Diário Fotográfico")
+        .navigationTitle("Fotos")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {

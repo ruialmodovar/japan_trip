@@ -29,7 +29,7 @@ struct RootView: View {
     var body: some View {
         TabView(selection: $navigation.selectedTab) {
             NavigationStack { TodayView().appMenuToolbar() }
-                .tabItem { Label("Hoje", systemImage: "sun.max.fill") }
+                .tabItem { Label("Home", systemImage: "house.fill") }
                 .tag(AppTab.today)
 
             NavigationStack { ItineraryView().appMenuToolbar() }
@@ -89,7 +89,7 @@ private struct AppMenuToolbarModifier: ViewModifier {
                     Button {
                         navigation.showsPhotos = true
                     } label: {
-                        Label("Registros fotográficos", systemImage: "photo.on.rectangle.angled")
+                        Label("Fotos", systemImage: "photo.on.rectangle.angled")
                     }
                     Divider()
                     Button {

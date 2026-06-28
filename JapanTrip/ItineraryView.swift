@@ -90,7 +90,7 @@ struct DayDetailView: View {
                 ExpectedClimateCard(day: day)
                 VStack(spacing: 0) {
                     ForEach(Array(day.activities.enumerated()), id: \.element.id) { index, activity in
-                        ActivityRow(activity: activity, color: day.city.color, isLast: index == day.activities.count - 1)
+                        ActivityRow(activity: activity, city: day.city, color: day.city.color, isLast: index == day.activities.count - 1)
                     }
                 }
                 .padding()
