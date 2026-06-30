@@ -1,6 +1,27 @@
 import Foundation
 import SwiftUI
 
+struct TripParticipant: Identifiable, Hashable {
+    let email: String
+    let name: String
+
+    var id: String { email }
+    var firstName: String { name.split(separator: " ").first.map(String.init) ?? name }
+
+    static let all: [TripParticipant] = [
+        .init(email: "ruialmodovar@gmail.com", name: "Rui Coelho"),
+        .init(email: "ana.botinas@gmail.com", name: "Ana Botinas Coelho"),
+        .init(email: "raquelbotinascoelho@gmail.com", name: "Raquel Botinas Coelho"),
+        .init(email: "mateus80@gmail.com", name: "Pedro Mateus"),
+        .init(email: "luestrellado@gmail.com", name: "Luciana Estrellado"),
+        .init(email: "biaestrellado@gmail.com", name: "Beatriz Mateus")
+    ]
+
+    static func participant(for email: String) -> TripParticipant? {
+        all.first { $0.email == email.lowercased() }
+    }
+}
+
 enum City: String, CaseIterable, Codable, Identifiable {
     case dubai = "Dubai"
     case tokyo = "Tóquio"

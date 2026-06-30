@@ -2,6 +2,7 @@ import SwiftUI
 
 struct TodayView: View {
     @EnvironmentObject private var navigation: AppNavigationState
+    @EnvironmentObject private var authentication: AuthenticationManager
     @State private var previewDate = Date()
 
     private var today: TripDay? {
@@ -17,6 +18,9 @@ struct TodayView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 18) {
+                if let name = authentication.authenticatedName {
+                    WelcomeCard(name: name)
+                }
                 if let today {
                     TripHeader(city: today.city, eyebrow: today.date.formatted(.dateTime.weekday(.wide).day().month(.wide).locale(Locale(identifier: "pt_BR"))), title: today.title, subtitle: "\(today.activities.count) momentos no roteiro")
 
@@ -65,6 +69,51 @@ struct TodayView: View {
                 previewDate = Date()
             }
         }
+    }
+}
+
+private struct WelcomeCard: View {
+    let name: String
+
+    private var firstName: String {
+        name.split(separator: " ").first.map(String.init) ?? name
+    }
+
+    var body: some View {
+        HStack(spacing: 14) {
+            ZStack {
+                Circle()
+                    .fill(.white.opacity(0.22))
+                    .frame(width: 48, height: 48)
+                Image(systemName: "person.crop.circle.fill")
+                    .font(.system(size: 30))
+                    .foregroundStyle(.white)
+            }
+            VStack(alignment: .leading, spacing: 3) {
+                Text("BEM-VINDO(A)")
+                    .font(.caption2.weight(.black))
+                    .tracking(1.2)
+                    .foregroundStyle(.white.opacity(0.75))
+                Text(firstName)
+                    .font(.title2.bold())
+                    .foregroundStyle(.white)
+                Text("A nossa aventura está cada vez mais perto.")
+                    .font(.caption)
+                    .foregroundStyle(.white.opacity(0.82))
+            }
+            Spacer()
+            Image(systemName: "sparkles")
+                .font(.title2)
+                .foregroundStyle(.yellow)
+        }
+        .padding(18)
+        .background(
+            LinearGradient(colors: [.indigo, .purple.opacity(0.82), .pink.opacity(0.82)], startPoint: .topLeading, endPoint: .bottomTrailing),
+            in: RoundedRectangle(cornerRadius: 22, style: .continuous)
+        )
+        .shadow(color: .indigo.opacity(0.18), radius: 14, y: 7)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Bem-vindo, \(name). A nossa aventura está cada vez mais perto.")
     }
 }
 

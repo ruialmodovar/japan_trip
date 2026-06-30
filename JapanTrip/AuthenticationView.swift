@@ -1,4 +1,3 @@
-import CryptoKit
 import LocalAuthentication
 import SwiftUI
 
@@ -6,10 +5,36 @@ import SwiftUI
 final class AuthenticationManager: ObservableObject {
     @Published private(set) var isAuthenticated = false
     @Published private(set) var isAuthenticating = false
+    @Published private(set) var authenticatedEmail: String?
     @Published var errorMessage: String?
 
-    private let passwordDigest = "958ea17de91b562488b425dc876192ea753035945abd3d9f26c72b254322514b"
+    private let authService: any SupabaseAuthenticating
+    private let sessionStore: any SecureSessionStoring
+    private var currentSession: SupabaseSession?
     private var lockSuppressionReasons: Set<String> = []
+
+    init(
+        authService: any SupabaseAuthenticating = SupabaseAuthService(),
+        sessionStore: any SecureSessionStoring = KeychainSessionStore()
+    ) {
+        self.authService = authService
+        self.sessionStore = sessionStore
+        authenticatedEmail = nil
+        currentSession = sessionStore.load()
+        let email = currentSession?.user.email?.lowercased()
+        if let email, TripParticipant.participant(for: email) != nil {
+            authenticatedEmail = email
+        } else if currentSession != nil {
+            sessionStore.clear()
+            currentSession = nil
+        }
+    }
+
+    var canUseBiometrics: Bool { authenticatedEmail != nil && currentSession != nil }
+    var authenticatedName: String? {
+        authenticatedEmail.flatMap { TripParticipant.participant(for: $0)?.name }
+    }
+    var authenticatedUserID: UUID? { currentSession?.user.id }
 
     var biometricLabel: String {
         let context = LAContext()
@@ -25,6 +50,10 @@ final class AuthenticationManager: ObservableObject {
 
     func authenticate() async {
         guard !isAuthenticating else { return }
+        guard canUseBiometrics else {
+            errorMessage = "Entre primeiro com o seu e-mail e senha."
+            return
+        }
         isAuthenticating = true
         errorMessage = nil
 
@@ -34,7 +63,7 @@ final class AuthenticationManager: ObservableObject {
         var policyError: NSError?
 
         guard context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &policyError) else {
-            errorMessage = "Biometria indisponível. Use a senha da viagem."
+            errorMessage = "Biometria indisponível. Use o seu e-mail e senha."
             isAuthenticating = false
             return
         }
@@ -44,36 +73,72 @@ final class AuthenticationManager: ObservableObject {
                 .deviceOwnerAuthenticationWithBiometrics,
                 localizedReason: "Aceda ao roteiro privado da viagem ao Japão."
             )
-            isAuthenticated = success
+            if success {
+                try await restoreSupabaseSession()
+                isAuthenticated = true
+            }
         } catch let error as LAError {
             if error.code != .userCancel && error.code != .systemCancel && error.code != .appCancel {
                 errorMessage = authenticationMessage(for: error.code)
             }
+        } catch let error as SupabaseAuthError {
+            errorMessage = error.localizedDescription
+        } catch is URLError {
+            // A sessão foi validada anteriormente pelo Supabase e está protegida
+            // pelo Keychain + biometria. Permite consultar o roteiro sem rede.
+            isAuthenticated = currentSession != nil
+            errorMessage = isAuthenticated ? nil : "Sem ligação para validar a sessão."
         } catch {
-            errorMessage = "Não foi possível autenticar. Tente novamente."
+            errorMessage = "Não foi possível validar a sessão. Verifique a ligação à internet."
         }
         isAuthenticating = false
     }
 
-    func authenticate(password: String) -> Bool {
+    @discardableResult
+    func authenticate(email: String, password: String) async -> Bool {
+        guard !isAuthenticating else { return false }
+        isAuthenticating = true
+        defer { isAuthenticating = false }
         errorMessage = nil
-        let digest = SHA256.hash(data: Data(password.utf8))
-            .map { String(format: "%02x", $0) }
-            .joined()
-
-        guard digest == passwordDigest else {
-            errorMessage = "Senha incorreta. Tente novamente."
+        let normalizedEmail = email.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard TripParticipant.participant(for: normalizedEmail) != nil else {
+            errorMessage = SupabaseAuthError.unauthorizedUser.localizedDescription
             return false
         }
 
-        isAuthenticated = true
-        return true
+        do {
+            let session = try await authService.signIn(email: normalizedEmail, password: password)
+            guard session.user.email?.lowercased() == normalizedEmail else {
+                throw SupabaseAuthError.unauthorizedUser
+            }
+            try sessionStore.save(session)
+            currentSession = session
+            authenticatedEmail = normalizedEmail
+            isAuthenticated = true
+            return true
+        } catch let error as SupabaseAuthError {
+            errorMessage = error.localizedDescription
+        } catch {
+            errorMessage = "Não foi possível entrar. Verifique a ligação à internet."
+        }
+        return false
     }
 
     func lock() {
         isAuthenticated = false
         isAuthenticating = false
         errorMessage = nil
+    }
+
+    func signOut() {
+        let accessToken = currentSession?.accessToken
+        lock()
+        authenticatedEmail = nil
+        currentSession = nil
+        sessionStore.clear()
+        if let accessToken {
+            Task { await authService.signOut(accessToken: accessToken) }
+        }
     }
 
     func lockIfAllowed() {
@@ -92,11 +157,34 @@ final class AuthenticationManager: ObservableObject {
     private func authenticationMessage(for code: LAError.Code) -> String {
         return switch code {
         case .authenticationFailed: "Não foi possível confirmar a identidade."
-        case .biometryLockout: "A biometria está bloqueada. Use a senha da viagem."
-        case .biometryNotEnrolled: "Biometria não configurada. Use a senha da viagem."
-        case .passcodeNotSet: "Use a senha da viagem para entrar."
+        case .biometryLockout: "A biometria está bloqueada. Use o seu e-mail e senha."
+        case .biometryNotEnrolled: "Biometria não configurada. Use o seu e-mail e senha."
+        case .passcodeNotSet: "Use o seu e-mail e senha para entrar."
         default: "Autenticação indisponível neste momento."
         }
+    }
+
+    private func restoreSupabaseSession() async throws {
+        guard let refreshToken = currentSession?.refreshToken else {
+            throw SupabaseAuthError.invalidCredentials
+        }
+        let session = try await authService.refreshSession(refreshToken: refreshToken)
+        guard let email = session.user.email?.lowercased(), TripParticipant.participant(for: email) != nil else {
+            throw SupabaseAuthError.unauthorizedUser
+        }
+        try sessionStore.save(session)
+        currentSession = session
+        authenticatedEmail = email
+    }
+
+    func accessTokenForAPI() async throws -> String {
+        guard let session = currentSession else { throw SupabaseAuthError.invalidCredentials }
+        if let expiresAt = session.expiresAt, Date().timeIntervalSince1970 < Double(expiresAt - 60) {
+            return session.accessToken
+        }
+        try await restoreSupabaseSession()
+        guard let token = currentSession?.accessToken else { throw SupabaseAuthError.invalidCredentials }
+        return token
     }
 }
 
@@ -119,8 +207,11 @@ struct AuthenticationGate: View {
 
 private struct AuthenticationView: View {
     @EnvironmentObject private var auth: AuthenticationManager
+    @State private var email = ""
     @State private var password = ""
-    @FocusState private var passwordIsFocused: Bool
+    @FocusState private var focusedField: Field?
+
+    private enum Field { case email, password }
 
     var body: some View {
         ZStack {
@@ -152,12 +243,27 @@ private struct AuthenticationView: View {
                     }
 
                     VStack(spacing: 12) {
-                        SecureField("Senha da viagem", text: $password)
-                            .textContentType(.password)
+                        TextField("E-mail", text: $email)
+                            .keyboardType(.emailAddress)
+                            .textContentType(.username)
                             .textInputAutocapitalization(.never)
                             .autocorrectionDisabled()
+                            .submitLabel(.next)
+                            .focused($focusedField, equals: .email)
+                            .onSubmit { focusedField = .password }
+                            .padding(.horizontal, 16)
+                            .frame(height: 54)
+                            .background(.white, in: RoundedRectangle(cornerRadius: 16))
+                            .overlay {
+                                RoundedRectangle(cornerRadius: 16)
+                                    .stroke(.pink.opacity(0.28), lineWidth: 1)
+                            }
+
+                        SecureField("Senha", text: $password)
+                            .textContentType(.password)
+                            .autocorrectionDisabled()
                             .submitLabel(.go)
-                            .focused($passwordIsFocused)
+                            .focused($focusedField, equals: .password)
                             .onSubmit(unlockWithPassword)
                             .padding(.horizontal, 16)
                             .frame(height: 54)
@@ -176,7 +282,7 @@ private struct AuthenticationView: View {
                         .buttonStyle(.borderedProminent)
                         .tint(Color(red: 0.88, green: 0.35, blue: 0.43))
                         .clipShape(RoundedRectangle(cornerRadius: 16))
-                        .disabled(password.isEmpty)
+                        .disabled(auth.isAuthenticating || email.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || password.isEmpty)
                     }
 
                     if let error = auth.errorMessage {
@@ -186,22 +292,24 @@ private struct AuthenticationView: View {
                             .multilineTextAlignment(.center)
                     }
 
-                    Button {
-                        Task { await auth.authenticate() }
-                    } label: {
-                        HStack(spacing: 8) {
-                            if auth.isAuthenticating {
-                                ProgressView()
-                            } else {
-                                Image(systemName: "faceid")
+                    if auth.canUseBiometrics {
+                        Button {
+                            Task { await auth.authenticate() }
+                        } label: {
+                            HStack(spacing: 8) {
+                                if auth.isAuthenticating {
+                                    ProgressView()
+                                } else {
+                                    Image(systemName: "faceid")
+                                }
+                                Text(auth.isAuthenticating ? "A autenticar…" : "Usar \(auth.biometricLabel)")
                             }
-                            Text(auth.isAuthenticating ? "A autenticar…" : "Usar \(auth.biometricLabel)")
                         }
+                        .font(.subheadline.weight(.semibold))
+                        .disabled(auth.isAuthenticating)
                     }
-                    .font(.subheadline.weight(.semibold))
-                    .disabled(auth.isAuthenticating)
 
-                    Label("Os dados permanecem apenas neste aparelho", systemImage: "lock.shield.fill")
+                    Label("Acesso restrito a utilizadores autorizados", systemImage: "lock.shield.fill")
                         .font(.caption)
                         .foregroundStyle(.secondary)
 
@@ -211,17 +319,24 @@ private struct AuthenticationView: View {
             }
         }
         .task {
-            await auth.authenticate()
+            if auth.canUseBiometrics {
+                await auth.authenticate()
+            } else {
+                focusedField = .email
+            }
         }
     }
 
     private func unlockWithPassword() {
-        if auth.authenticate(password: password) {
-            password = ""
-            passwordIsFocused = false
-        } else {
-            password = ""
-            passwordIsFocused = true
+        Task {
+            if await auth.authenticate(email: email, password: password) {
+                email = ""
+                password = ""
+                focusedField = nil
+            } else {
+                password = ""
+                focusedField = .password
+            }
         }
     }
 }

@@ -34,7 +34,23 @@ O menu superior contém um diário privado para tirar fotografias diretamente co
 
 ## Autenticação
 
-O roteiro é protegido por uma senha partilhada pelo grupo. Face ID, Touch ID ou código do iPhone continuam disponíveis como atalho opcional. O app volta a bloquear quando é colocado em segundo plano. A senha não é armazenada em texto simples no projeto.
+O roteiro é protegido por Supabase Auth e por uma lista fechada de utilizadores. As senhas são validadas exclusivamente no servidor e não existem no código do app. A sessão é guardada no Keychain com proteção exclusiva do dispositivo. Face ID ou Touch ID ficam disponíveis apenas depois do primeiro acesso válido e renovam a sessão no Supabase. O app volta a bloquear quando é colocado em segundo plano e o menu permite terminar a sessão por completo.
+
+## Modo offline
+
+O roteiro, voos, hotéis, reservas, checklist, clima esperado e guias de mobilidade são incluídos no app. O menu Modo Offline permite guardar mapas de referência das quatro cidades, atualizar a última previsão meteorológica e consultar contactos de hotéis e emergências. Uma sessão anteriormente validada pode ser reaberta offline com biometria. Rotas e transportes em tempo real continuam dependentes de rede; para navegação completa, o utilizador deve descarregar as cidades no Apple Maps.
+
+## Notificações inteligentes
+
+O app agenda localmente resumos da agenda, lembretes 40 minutos antes de compromissos importantes, saídas para o aeroporto, avisos de check-out e lembretes especiais como DisneySea. A última previsão guardada também pode gerar um aviso matinal de chuva. Os tipos de aviso podem ser ativados individualmente e continuam a funcionar sem rede depois de agendados.
+
+## Cofre de documentos
+
+O cofre importa PDFs, imagens, passaportes, seguros, bilhetes, reservas e QR Codes. Cada ficheiro e o índice de documentos são cifrados individualmente com AES-256-GCM. A chave é guardada no Keychain com `biometryCurrentSet`, apenas para este dispositivo, e o cofre volta a bloquear quando o app passa para segundo plano. Os ficheiros não entram no backup e as cópias temporárias criadas para Quick Look são eliminadas ao fechar.
+
+## Localização do grupo
+
+Cada participante pode ativar ou desligar voluntariamente a partilha de localização aproximada. O app usa permissão `When In Use`, atualiza apenas enquanto está aberto e remove o ponto do Supabase quando a partilha é desligada. O mapa mostra o nome e a hora da última atualização. Antes de usar, execute `supabase/location_sharing.sql` no SQL Editor do projeto para criar a tabela e as políticas RLS restritas aos seis e-mails.
 
 ## Privacidade
 

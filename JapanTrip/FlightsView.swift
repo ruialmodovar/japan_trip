@@ -17,8 +17,8 @@ struct FlightLeg: Identifiable, Hashable {
     static let trip: [FlightLeg] = [
         .init(id: "EK262", flightNumber: "EK262", dateText: "Qua, 8 jul", departureAirport: "GRU", departureCity: "São Paulo", departureTime: "01:05", arrivalAirport: "DXB", arrivalCity: "Dubai", arrivalTime: "23:00", duration: "14h55", aircraftNote: nil, isDateConfirmed: true),
         .init(id: "EK312", flightNumber: "EK312", dateText: "Dom, 12 jul", departureAirport: "DXB", departureCity: "Dubai", departureTime: "07:40", arrivalAirport: "HND", arrivalCity: "Tóquio", arrivalTime: "22:20", duration: "9h40", aircraftNote: nil, isDateConfirmed: true),
-        .init(id: "EK317", flightNumber: "EK317", dateText: "Sáb, 25 jul · confirmar", departureAirport: "KIX", departureCity: "Osaka", departureTime: "23:45", arrivalAirport: "DXB", arrivalCity: "Dubai", arrivalTime: "04:35 +1", duration: "9h50", aircraftNote: "Horário de chegada calculado a partir da duração indicada no roteiro.", isDateConfirmed: false),
-        .init(id: "EK261", flightNumber: "EK261", dateText: "Dom, 26 jul", departureAirport: "DXB", departureCity: "Dubai", departureTime: "09:05", arrivalAirport: "GRU", arrivalCity: "São Paulo", arrivalTime: "17:15", duration: "15h10", aircraftNote: "Partida estimada considerando conexão de 4h30 em Dubai.", isDateConfirmed: false)
+        .init(id: "EK317", flightNumber: "EK317", dateText: "Sáb, 25 jul", departureAirport: "KIX", departureCity: "Osaka", departureTime: "23:45", arrivalAirport: "DXB", arrivalCity: "Dubai", arrivalTime: "04:15 +1", duration: "9h30", aircraftNote: nil, isDateConfirmed: true),
+        .init(id: "EK261", flightNumber: "EK261", dateText: "Dom, 26 jul", departureAirport: "DXB", departureCity: "Dubai", departureTime: "09:05", arrivalAirport: "GRU", arrivalCity: "São Paulo", arrivalTime: "17:15", duration: "15h10", aircraftNote: "Conexão de 4h50 em Dubai.", isDateConfirmed: true)
     ]
 }
 
@@ -30,7 +30,6 @@ struct FlightsView: View {
         ScrollView {
             VStack(spacing: 18) {
                 overview
-                returnWarning
                 ForEach(FlightLeg.trip) { flight in
                     FlightCard(flight: flight)
                 }
@@ -75,15 +74,6 @@ struct FlightsView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding()
         .background(LinearGradient(colors: [.red.opacity(0.16), .orange.opacity(0.08)], startPoint: .topLeading, endPoint: .bottomTrailing), in: RoundedRectangle(cornerRadius: 22))
-    }
-
-    private var returnWarning: some View {
-        Label("O resumo indica saída de KIX em 25/07, enquanto uma página diária diz 24/07. A chegada em GRU em 26/07 às 17:15 é compatível com partida em 25/07. Confirmar diretamente no bilhete Emirates.", systemImage: "exclamationmark.triangle.fill")
-            .font(.subheadline)
-            .foregroundStyle(.orange)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding()
-            .background(.orange.opacity(0.09), in: RoundedRectangle(cornerRadius: 18))
     }
 
     private var travelRules: some View {

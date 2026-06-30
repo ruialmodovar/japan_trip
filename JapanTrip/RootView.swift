@@ -9,15 +9,25 @@ final class AppNavigationState: ObservableObject {
     @Published var selectedTab: AppTab = .today
     @Published var showsMobility = false
     @Published var showsFlights = false
+    @Published var showsHotels = false
     @Published var showsWeather = false
     @Published var showsPhotos = false
+    @Published var showsOffline = false
+    @Published var showsNotifications = false
+    @Published var showsDocumentVault = false
+    @Published var showsLocationSharing = false
     @Published private(set) var homeRequestID = 0
 
     func goHome() {
         showsMobility = false
         showsFlights = false
+        showsHotels = false
         showsWeather = false
         showsPhotos = false
+        showsOffline = false
+        showsNotifications = false
+        showsDocumentVault = false
+        showsLocationSharing = false
         selectedTab = .today
         homeRequestID += 1
     }
@@ -53,6 +63,10 @@ struct RootView: View {
             NavigationStack { FlightsView() }
                 .environmentObject(navigation)
         }
+        .sheet(isPresented: $navigation.showsHotels) {
+            NavigationStack { HotelsView() }
+                .environmentObject(navigation)
+        }
         .sheet(isPresented: $navigation.showsWeather) {
             NavigationStack { WeatherView() }
                 .environmentObject(navigation)
@@ -61,11 +75,29 @@ struct RootView: View {
             NavigationStack { PhotoJournalView() }
                 .environmentObject(navigation)
         }
+        .sheet(isPresented: $navigation.showsOffline) {
+            NavigationStack { OfflineView() }
+                .environmentObject(navigation)
+        }
+        .sheet(isPresented: $navigation.showsNotifications) {
+            NavigationStack { NotificationsView() }
+                .environmentObject(navigation)
+        }
+        .sheet(isPresented: $navigation.showsDocumentVault) {
+            NavigationStack { DocumentVaultView() }
+                .environmentObject(navigation)
+        }
+        .sheet(isPresented: $navigation.showsLocationSharing) {
+            NavigationStack { LocationSharingView() }
+                .environmentObject(navigation)
+        }
     }
 }
 
 private struct AppMenuToolbarModifier: ViewModifier {
     @EnvironmentObject private var navigation: AppNavigationState
+    @EnvironmentObject private var authentication: AuthenticationManager
+    @EnvironmentObject private var locationSharing: LocationSharingManager
 
     func body(content: Content) -> some View {
         content.toolbar {
@@ -85,6 +117,31 @@ private struct AppMenuToolbarModifier: ViewModifier {
                         navigation.showsFlights = true
                     } label: {
                         Label("Voos", systemImage: "airplane")
+                    }
+                    Button {
+                        navigation.showsHotels = true
+                    } label: {
+                        Label("Hotéis", systemImage: "bed.double.fill")
+                    }
+                    Button {
+                        navigation.showsOffline = true
+                    } label: {
+                        Label("Modo Offline", systemImage: "icloud.and.arrow.down.fill")
+                    }
+                    Button {
+                        navigation.showsNotifications = true
+                    } label: {
+                        Label("Notificações", systemImage: "bell.badge.fill")
+                    }
+                    Button {
+                        navigation.showsDocumentVault = true
+                    } label: {
+                        Label("Cofre de documentos", systemImage: "lock.doc.fill")
+                    }
+                    Button {
+                        navigation.showsLocationSharing = true
+                    } label: {
+                        Label("Localização do grupo", systemImage: "location.fill.viewfinder")
                     }
                     Button {
                         navigation.showsPhotos = true
@@ -111,6 +168,15 @@ private struct AppMenuToolbarModifier: ViewModifier {
                         navigation.selectedTab = .checklist
                     } label: {
                         Label("Checklist", systemImage: "checklist")
+                    }
+                    Divider()
+                    Button(role: .destructive) {
+                        Task {
+                            await locationSharing.setSharing(false, authentication: authentication)
+                            authentication.signOut()
+                        }
+                    } label: {
+                        Label("Terminar sessão", systemImage: "rectangle.portrait.and.arrow.right")
                     }
                 } label: {
                     Image(systemName: "line.3.horizontal.circle.fill")

@@ -7,6 +7,10 @@ struct JapanTripApp: App {
     @StateObject private var weather = WeatherStore()
     @StateObject private var navigation = AppNavigationState()
     @StateObject private var photoJournal = PhotoJournalStore()
+    @StateObject private var offlineStore = OfflineStore()
+    @StateObject private var notifications = NotificationManager()
+    @StateObject private var documentVault = DocumentVaultStore()
+    @StateObject private var locationSharing = LocationSharingManager()
     @Environment(\.scenePhase) private var scenePhase
 
     var body: some Scene {
@@ -17,11 +21,32 @@ struct JapanTripApp: App {
                 .environmentObject(weather)
                 .environmentObject(navigation)
                 .environmentObject(photoJournal)
+                .environmentObject(offlineStore)
+                .environmentObject(notifications)
+                .environmentObject(documentVault)
+                .environmentObject(locationSharing)
                 .preferredColorScheme(.light)
+                .task {
+                    await notifications.refreshStatus()
+                    if notifications.authorizationStatus == .authorized {
+                        await notifications.enableAndSchedule(weatherSnapshots: weather.snapshots)
+                    }
+                }
+                .onChange(of: authentication.isAuthenticated) { _, signedIn in
+                    if signedIn {
+                        locationSharing.resumeIfNeeded(authentication: authentication)
+                    } else {
+                        locationSharing.pauseUpdates()
+                    }
+                }
         }
         .onChange(of: scenePhase) { _, newPhase in
             if newPhase == .background {
                 authentication.lockIfAllowed()
+                documentVault.lock()
+                locationSharing.pauseUpdates()
+            } else if newPhase == .active, authentication.isAuthenticated {
+                locationSharing.resumeIfNeeded(authentication: authentication)
             }
         }
     }

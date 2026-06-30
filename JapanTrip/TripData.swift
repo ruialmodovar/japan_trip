@@ -118,16 +118,18 @@ enum TripData {
             activity(23, 4, "17:00", "Dotonbori e Namba", "Namba Parks, Hozenji Yokocho e Don Quijote.", .attraction, location: "Namba Osaka"),
             activity(23, 5, "19:30", "Jantar em Dotonbori", "Kani Doraku, Harukoma Sushi ou izakaya.", .food)
         ]),
-        TripDay(id: "2026-07-24", date: TripDate.make(24), city: .osaka, title: "Umeda e possível partida", note: "Atenção: o PDF alterna entre partida em 24 e 25 de julho. Confirmar no bilhete.", activities: [
+        TripDay(id: "2026-07-24", date: TripDate.make(24), city: .osaka, title: "Umeda e compras finais", note: "Último dia completo em Osaka; deixar as malas praticamente prontas.", activities: [
             activity(24, 1, "09:30", "Compras finais em Umeda", "Yodobashi, Grand Front e Pokémon Center.", .shopping, location: "Yodobashi Camera Umeda"),
             activity(24, 2, "11:30", "Umeda Sky Building", "Observatório com vista de 360°.", .attraction, location: "Umeda Sky Building", critical: true),
             activity(24, 3, "13:00", "Almoço final", "Wagyu, ramen ou 551 Horai.", .food),
             activity(24, 4, "15:00", "Organizar malas", "Recibos tax-free e baterias na mala de mão.", .luggage),
-            activity(24, 5, "18:00", "Transfer para KIX — confirmar data", "Chegar ao aeroporto até 21:00.", .transport, location: "Kansai International Airport", critical: true),
-            activity(24, 6, "23:45", "Voo EK317 — confirmar data", "KIX → DXB → GRU.", .flight, critical: true)
+            activity(24, 5, "19:00", "Jantar de despedida", "Uma última noite tranquila em Osaka.", .food)
         ]),
-        TripDay(id: "2026-07-25", date: TripDate.make(25), city: .travel, title: "Data sob confirmação", note: "O resumo do PDF indica retorno em 25/07, em conflito com a programação detalhada de 24/07.", activities: [
-            activity(25, 1, "—", "Confirmar bilhete Emirates", "Atualizar o app assim que a data correta do EK317 for confirmada.", .flight, critical: true)
+        TripDay(id: "2026-07-25", date: TripDate.make(25), city: .travel, title: "Osaka → Dubai", note: "Voo noturno; chegar ao aeroporto com pelo menos três horas de antecedência.", activities: [
+            activity(25, 1, "12:00", "Check-out", "Deixar as malas guardadas no Osaka Station Hotel.", .hotel, location: "Osaka Station Hotel", critical: true),
+            activity(25, 2, "12:30", "Almoço e tarde livre", "Programa leve perto de Umeda antes da viagem.", .rest),
+            activity(25, 3, "19:30", "Transfer para KIX", "Recolher malas e seguir para o Aeroporto Internacional de Kansai.", .transport, location: "Kansai International Airport", critical: true),
+            activity(25, 4, "23:45", "Voo EK317", "KIX → DXB · chegada às 04:15 do dia seguinte.", .flight, critical: true)
         ])
     ]
 

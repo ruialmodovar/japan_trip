@@ -1,5 +1,6 @@
 import XCTest
 import UIKit
+import CryptoKit
 @testable import JapanTrip
 
 final class TripDataTests: XCTestCase {
@@ -43,11 +44,30 @@ final class FlightTests: XCTestCase {
         XCTAssertEqual(FlightLeg.trip.last?.arrivalAirport, "GRU")
     }
 
-    func testReturnDateConflictRemainsVisible() {
+    func testReturnFlightsMatchLatestTravelDocument() {
         let returnLeg = FlightLeg.trip.first { $0.flightNumber == "EK317" }
         XCTAssertNotNil(returnLeg)
-        XCTAssertFalse(returnLeg?.isDateConfirmed ?? true)
-        XCTAssertTrue(returnLeg?.dateText.contains("confirmar") ?? false)
+        XCTAssertTrue(returnLeg?.isDateConfirmed ?? false)
+        XCTAssertEqual(returnLeg?.arrivalTime, "04:15 +1")
+        XCTAssertEqual(returnLeg?.duration, "9h30")
+    }
+}
+
+final class HotelTests: XCTestCase {
+    func testAllHotelStaysArePresentInOrder() {
+        XCTAssertEqual(HotelStay.trip.map(\.city), ["Dubai", "Tóquio", "Kyoto", "Osaka"])
+        XCTAssertEqual(HotelStay.trip.map(\.nights).reduce(0, +), 17)
+        XCTAssertEqual(Set(HotelStay.trip.map(\.id)).count, 4)
+    }
+
+    func testEveryHotelHasUsefulActions() {
+        for hotel in HotelStay.trip {
+            XCTAssertFalse(hotel.address.isEmpty)
+            XCTAssertNotNil(hotel.telephoneURL)
+            XCTAssertEqual(hotel.officialURL.scheme, "https")
+            XCTAssertEqual(hotel.bookingURL.host, "www.booking.com")
+            XCTAssertEqual(hotel.mapURL.host, "maps.apple.com")
+        }
     }
 }
 
@@ -100,18 +120,50 @@ final class WeatherTests: XCTestCase {
 
 @MainActor
 final class AuthenticationAndNavigationTests: XCTestCase {
-    func testSharedPasswordUnlocksAndWrongPasswordFails() {
-        let authentication = AuthenticationManager()
-        XCTAssertFalse(authentication.authenticate(password: "rakeru"), "A senha deve respeitar maiúsculas")
+    func testSupabaseLoginUnlocksAndWrongPasswordFails() async {
+        let authentication = makeAuthentication()
+        let wrongPasswordResult = await authentication.authenticate(email: "ruialmodovar@gmail.com", password: "wrong-password")
+        XCTAssertFalse(wrongPasswordResult)
         XCTAssertFalse(authentication.isAuthenticated)
-        XCTAssertTrue(authentication.authenticate(password: "Rakeru"))
+        let validResult = await authentication.authenticate(email: " RUIALMODOVAR@GMAIL.COM ", password: "valid-test-password")
+        XCTAssertTrue(validResult)
         XCTAssertTrue(authentication.isAuthenticated)
+        XCTAssertEqual(authentication.authenticatedEmail, "ruialmodovar@gmail.com")
+        XCTAssertEqual(authentication.authenticatedName, "Rui Coelho")
+        authentication.signOut()
+    }
+
+    func testOnlyAuthorizedSupabaseUsersUnlock() async {
+        let authentication = makeAuthentication()
+        let authorized = [
+            ("ruialmodovar@gmail.com", "Rui Coelho"),
+            ("ana.botinas@gmail.com", "Ana Botinas Coelho"),
+            ("raquelbotinascoelho@gmail.com", "Raquel Botinas Coelho"),
+            ("mateus80@gmail.com", "Pedro Mateus"),
+            ("luestrellado@gmail.com", "Luciana Estrellado"),
+            ("biaestrellado@gmail.com", "Beatriz Mateus")
+        ]
+
+        for (email, name) in authorized {
+            let result = await authentication.authenticate(email: email, password: "valid-test-password")
+            XCTAssertTrue(result, email)
+            XCTAssertEqual(authentication.authenticatedName, name)
+            authentication.signOut()
+            XCTAssertNil(authentication.authenticatedName)
+        }
+        let unauthorizedResult = await authentication.authenticate(email: "intruso@example.com", password: "valid-test-password")
+        XCTAssertFalse(unauthorizedResult)
     }
 
     func testHomeResetsNavigationState() {
         let navigation = AppNavigationState()
         navigation.selectedTab = .checklist
         navigation.showsFlights = true
+        navigation.showsHotels = true
+        navigation.showsOffline = true
+        navigation.showsNotifications = true
+        navigation.showsDocumentVault = true
+        navigation.showsLocationSharing = true
         navigation.showsMobility = true
         let previousRequest = navigation.homeRequestID
 
@@ -119,9 +171,173 @@ final class AuthenticationAndNavigationTests: XCTestCase {
 
         XCTAssertEqual(navigation.selectedTab, .today)
         XCTAssertFalse(navigation.showsFlights)
+        XCTAssertFalse(navigation.showsHotels)
+        XCTAssertFalse(navigation.showsOffline)
+        XCTAssertFalse(navigation.showsNotifications)
+        XCTAssertFalse(navigation.showsDocumentVault)
+        XCTAssertFalse(navigation.showsLocationSharing)
         XCTAssertFalse(navigation.showsMobility)
         XCTAssertEqual(navigation.homeRequestID, previousRequest + 1)
     }
+
+    private func makeAuthentication() -> AuthenticationManager {
+        AuthenticationManager(
+            authService: MockSupabaseAuthService(),
+            sessionStore: InMemorySessionStore()
+        )
+    }
+}
+
+final class OfflineDataTests: XCTestCase {
+    func testOfflinePackCoversEveryDestination() {
+        XCTAssertEqual(OfflineMapDestination.trip.map(\.city), [.dubai, .tokyo, .kyoto, .osaka])
+        XCTAssertEqual(Set(OfflineMapDestination.trip.map(\.id)).count, 4)
+    }
+
+    func testEmergencyContactsIncludeBothCountries() {
+        XCTAssertTrue(EmergencyContact.trip.contains { $0.country == "Japão" && $0.number == "110" })
+        XCTAssertTrue(EmergencyContact.trip.contains { $0.country == "Japão" && $0.number == "119" })
+        XCTAssertTrue(EmergencyContact.trip.contains { $0.country == "Emirados Árabes Unidos" && $0.number == "999" })
+        XCTAssertTrue(EmergencyContact.trip.contains { $0.country == "Emirados Árabes Unidos" && $0.number == "998" })
+    }
+}
+
+final class NotificationPlannerTests: XCTestCase {
+    private var defaults: UserDefaults!
+
+    override func setUp() {
+        defaults = UserDefaults(suiteName: UUID().uuidString)!
+        defaults.set(true, forKey: NotificationPreferenceKey.agenda)
+        defaults.set(true, forKey: NotificationPreferenceKey.reminders)
+        defaults.set(true, forKey: NotificationPreferenceKey.hotels)
+        defaults.set(true, forKey: NotificationPreferenceKey.weather)
+    }
+
+    func testPlanIncludesAgendaFlightsHotelsAndDisney() throws {
+        let now = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-06-29T12:00:00Z"))
+        let plan = TripNotificationPlanner.makePlan(now: now, defaults: defaults)
+        XCTAssertTrue(plan.contains { $0.id == "special-disneysea" })
+        XCTAssertTrue(plan.contains { $0.id == "checkout-blossom" && $0.title.contains("11:00") })
+        XCTAssertTrue(plan.contains { $0.id == "flight-EK317" })
+        XCTAssertTrue(plan.contains { $0.kind == .agenda })
+        XCTAssertEqual(Set(plan.map(\.id)).count, plan.count)
+        XCTAssertLessThanOrEqual(plan.count, 60)
+    }
+
+    func testDisabledCategoriesAreNotPlanned() throws {
+        defaults.set(false, forKey: NotificationPreferenceKey.agenda)
+        defaults.set(false, forKey: NotificationPreferenceKey.hotels)
+        let now = try XCTUnwrap(ISO8601DateFormatter().date(from: "2026-06-29T12:00:00Z"))
+        let plan = TripNotificationPlanner.makePlan(now: now, defaults: defaults)
+        XCTAssertFalse(plan.contains { $0.kind == .agenda })
+        XCTAssertFalse(plan.contains { $0.kind == .hotel })
+    }
+}
+
+@MainActor
+final class DocumentVaultTests: XCTestCase {
+    private var directory: URL!
+    private var store: DocumentVaultStore!
+    private let key = SymmetricKey(size: .bits256)
+
+    override func setUp() async throws {
+        directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        store = DocumentVaultStore(directory: directory)
+        try store.unlockForTesting(with: key)
+    }
+
+    override func tearDown() async throws {
+        store.lock()
+        try? FileManager.default.removeItem(at: directory)
+        store = nil
+    }
+
+    func testEncryptedImportPreviewAndPersistence() throws {
+        let secret = Data("PASSAPORTE-TESTE-123".utf8)
+        try store.addDocument(data: secret, name: "Passaporte", category: .passport, fileExtension: "pdf")
+        let document = try XCTUnwrap(store.documents.first)
+
+        let encryptedURL = directory.appendingPathComponent(document.encryptedFilename)
+        let encrypted = try Data(contentsOf: encryptedURL)
+        XCTAssertNotEqual(encrypted, secret)
+        XCTAssertFalse(String(decoding: encrypted, as: UTF8.self).contains("PASSAPORTE"))
+
+        let preview = try store.previewURL(for: document)
+        XCTAssertEqual(try Data(contentsOf: preview), secret)
+        store.cleanupPreview(preview)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: preview.path))
+
+        let reloaded = DocumentVaultStore(directory: directory)
+        try reloaded.unlockForTesting(with: key)
+        XCTAssertEqual(reloaded.documents.first?.name, "Passaporte")
+    }
+
+    func testDeleteRemovesEncryptedDocument() throws {
+        try store.addDocument(data: Data("QR".utf8), name: "QR Disney", category: .qrCode, fileExtension: "png")
+        let document = try XCTUnwrap(store.documents.first)
+        let encryptedURL = directory.appendingPathComponent(document.encryptedFilename)
+        store.delete(document)
+        XCTAssertTrue(store.documents.isEmpty)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: encryptedURL.path))
+    }
+}
+
+final class LocationSharingDataTests: XCTestCase {
+    func testAllSixParticipantsHaveUniqueAccountsAndNames() {
+        XCTAssertEqual(TripParticipant.all.count, 6)
+        XCTAssertEqual(Set(TripParticipant.all.map(\.email)).count, 6)
+        XCTAssertTrue(TripParticipant.all.allSatisfy { !$0.name.isEmpty })
+    }
+
+    func testSharedLocationDecodesSupabasePayload() throws {
+        let json = #"""
+        {
+          "user_id": "00000000-0000-0000-0000-000000000001",
+          "email": "ruialmodovar@gmail.com",
+          "latitude": 35.6762,
+          "longitude": 139.6503,
+          "accuracy": 42.0,
+          "updated_at": "2026-07-13T10:15:30.123Z"
+        }
+        """#
+        let location = try JSONDecoder().decode(SharedParticipantLocation.self, from: Data(json.utf8))
+        XCTAssertEqual(location.participant?.name, "Rui Coelho")
+        XCTAssertEqual(location.coordinate.latitude, 35.6762)
+        XCTAssertNotNil(location.updatedDate)
+    }
+}
+
+private struct MockSupabaseAuthService: SupabaseAuthenticating {
+    func signIn(email: String, password: String) async throws -> SupabaseSession {
+        guard password == "valid-test-password" else {
+            throw SupabaseAuthError.invalidCredentials
+        }
+        return makeSession(email: email)
+    }
+
+    func refreshSession(refreshToken: String) async throws -> SupabaseSession {
+        makeSession(email: "ruialmodovar@gmail.com")
+    }
+
+    func signOut(accessToken: String) async {}
+
+    private func makeSession(email: String) -> SupabaseSession {
+        .init(
+            accessToken: "test-access-token",
+            refreshToken: "test-refresh-token",
+            expiresIn: 3_600,
+            expiresAt: Int(Date().addingTimeInterval(3_600).timeIntervalSince1970),
+            user: .init(id: UUID(uuidString: "00000000-0000-0000-0000-000000000001")!, email: email)
+        )
+    }
+}
+
+private final class InMemorySessionStore: SecureSessionStoring {
+    private var session: SupabaseSession?
+
+    func load() -> SupabaseSession? { session }
+    func save(_ session: SupabaseSession) throws { self.session = session }
+    func clear() { session = nil }
 }
 
 @MainActor
