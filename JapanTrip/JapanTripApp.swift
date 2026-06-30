@@ -11,6 +11,8 @@ struct JapanTripApp: App {
     @StateObject private var notifications = NotificationManager()
     @StateObject private var documentVault = DocumentVaultStore()
     @StateObject private var locationSharing = LocationSharingManager()
+    @StateObject private var expenses = ExpenseStore()
+    @StateObject private var shopping = ShoppingStore()
     @Environment(\.scenePhase) private var scenePhase
 
     var body: some Scene {
@@ -25,6 +27,8 @@ struct JapanTripApp: App {
                 .environmentObject(notifications)
                 .environmentObject(documentVault)
                 .environmentObject(locationSharing)
+                .environmentObject(expenses)
+                .environmentObject(shopping)
                 .preferredColorScheme(.light)
                 .task {
                     await notifications.refreshStatus()

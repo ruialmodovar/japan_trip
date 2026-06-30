@@ -29,6 +29,8 @@
 		A10000000000000000000022 /* NotificationsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000022 /* NotificationsView.swift */; };
 		A10000000000000000000023 /* DocumentVaultView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000023 /* DocumentVaultView.swift */; };
 		A10000000000000000000024 /* LocationSharingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000024 /* LocationSharingView.swift */; };
+		A10000000000000000000025 /* ExpensesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000025 /* ExpensesView.swift */; };
+		A10000000000000000000026 /* ShoppingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000026 /* ShoppingView.swift */; };
 		A10000000000000000000020 /* JapanTripTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000020 /* JapanTripTests.swift */; };
 /* End PBXBuildFile section */
 
@@ -66,6 +68,8 @@
 		B10000000000000000000022 /* NotificationsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationsView.swift; sourceTree = "<group>"; };
 		B10000000000000000000023 /* DocumentVaultView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentVaultView.swift; sourceTree = "<group>"; };
 		B10000000000000000000024 /* LocationSharingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocationSharingView.swift; sourceTree = "<group>"; };
+		B10000000000000000000025 /* ExpensesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExpensesView.swift; sourceTree = "<group>"; };
+		B10000000000000000000026 /* ShoppingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShoppingView.swift; sourceTree = "<group>"; };
 		B10000000000000000000020 /* JapanTripTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JapanTripTests.swift; sourceTree = "<group>"; };
 		B10000000000000000000021 /* JapanTripTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = JapanTripTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -122,6 +126,8 @@
 				B10000000000000000000022 /* NotificationsView.swift */,
 				B10000000000000000000023 /* DocumentVaultView.swift */,
 				B10000000000000000000024 /* LocationSharingView.swift */,
+				B10000000000000000000025 /* ExpensesView.swift */,
+				B10000000000000000000026 /* ShoppingView.swift */,
 			);
 			path = JapanTrip;
 			sourceTree = "<group>";
@@ -263,6 +269,8 @@
 				A10000000000000000000022 /* NotificationsView.swift in Sources */,
 				A10000000000000000000023 /* DocumentVaultView.swift in Sources */,
 				A10000000000000000000024 /* LocationSharingView.swift in Sources */,
+				A10000000000000000000025 /* ExpensesView.swift in Sources */,
+				A10000000000000000000026 /* ShoppingView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

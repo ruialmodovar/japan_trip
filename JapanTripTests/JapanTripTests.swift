@@ -164,6 +164,8 @@ final class AuthenticationAndNavigationTests: XCTestCase {
         navigation.showsNotifications = true
         navigation.showsDocumentVault = true
         navigation.showsLocationSharing = true
+        navigation.showsExpenses = true
+        navigation.showsShopping = true
         navigation.showsMobility = true
         let previousRequest = navigation.homeRequestID
 
@@ -176,6 +178,8 @@ final class AuthenticationAndNavigationTests: XCTestCase {
         XCTAssertFalse(navigation.showsNotifications)
         XCTAssertFalse(navigation.showsDocumentVault)
         XCTAssertFalse(navigation.showsLocationSharing)
+        XCTAssertFalse(navigation.showsExpenses)
+        XCTAssertFalse(navigation.showsShopping)
         XCTAssertFalse(navigation.showsMobility)
         XCTAssertEqual(navigation.homeRequestID, previousRequest + 1)
     }
@@ -304,6 +308,78 @@ final class LocationSharingDataTests: XCTestCase {
         XCTAssertEqual(location.participant?.name, "Rui Coelho")
         XCTAssertEqual(location.coordinate.latitude, 35.6762)
         XCTAssertNotNil(location.updatedDate)
+    }
+}
+
+@MainActor
+final class ExpenseStoreTests: XCTestCase {
+    private var directory: URL!
+    private var store: ExpenseStore!
+
+    override func setUp() async throws {
+        directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        store = ExpenseStore(directory: directory)
+    }
+
+    override func tearDown() async throws {
+        try? FileManager.default.removeItem(at: directory)
+        store = nil
+    }
+
+    func testConversionSplitAndBalances() {
+        let participants = Set(TripParticipant.all.prefix(2).map(\.email))
+        let payer = TripParticipant.all[0].email
+        let expense = TripExpense(id: UUID(), title: "Jantar", amount: 2_750, currency: .JPY, date: TripDate.make(13), category: .food, payerEmail: payer, participantEmails: participants, note: "")
+        store.add(expense)
+
+        let value = store.amountInBRL(expense)
+        XCTAssertEqual(store.totalBRL(), value, accuracy: 0.001)
+        XCTAssertEqual(store.balancesBRL()[payer] ?? 0, value / 2, accuracy: 0.001)
+        XCTAssertEqual(store.balancesBRL()[TripParticipant.all[1].email] ?? 0, -value / 2, accuracy: 0.001)
+    }
+
+    func testExpensesPersistAndDelete() {
+        let expense = TripExpense(id: UUID(), title: "Metrô", amount: 20, currency: .AED, date: TripDate.make(9), category: .transport, payerEmail: TripParticipant.all[0].email, participantEmails: Set(TripParticipant.all.map(\.email)), note: "")
+        store.add(expense)
+        let reloaded = ExpenseStore(directory: directory)
+        XCTAssertEqual(reloaded.expenses.first?.title, "Metrô")
+        reloaded.delete(expense)
+        XCTAssertTrue(reloaded.expenses.isEmpty)
+    }
+}
+
+final class PriceOCRParserTests: XCTestCase {
+    func testRecognizesJapaneseAndInternationalPriceFormats() {
+        let text = "SPECIAL PRICE ¥12,800\nAED 249.50\nUSD 79.99\n€65,00"
+        let prices = PriceOCRParser.prices(in: text)
+        XCTAssertTrue(prices.contains { $0.currency == .JPY && $0.amount == 12_800 })
+        XCTAssertTrue(prices.contains { $0.currency == .AED && $0.amount == 249.50 })
+        XCTAssertTrue(prices.contains { $0.currency == .USD && $0.amount == 79.99 })
+        XCTAssertTrue(prices.contains { $0.currency == .EUR && $0.amount == 65 })
+    }
+
+    func testUsesDefaultCurrencyForUnlabelledPrice() {
+        let prices = PriceOCRParser.prices(in: "SALE 9,800", defaultCurrency: .JPY)
+        XCTAssertEqual(prices.first?.currency, .JPY)
+        XCTAssertEqual(prices.first?.amount, 9_800)
+    }
+}
+
+@MainActor
+final class ShoppingStoreTests: XCTestCase {
+    func testShoppingItemPersistsAndCanBePurchased() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let store = ShoppingStore(directory: directory)
+        let image = UIGraphicsImageRenderer(size: CGSize(width: 20, height: 20)).image { context in
+            UIColor.systemYellow.setFill(); context.fill(CGRect(x: 0, y: 0, width: 20, height: 20))
+        }
+        try store.add(name: "Onitsuka Tiger", image: image, amount: 22_000, currency: .JPY, storeName: "Ginza", taxFreeEnabled: true)
+        let item = try XCTUnwrap(store.items.first)
+        XCTAssertTrue(FileManager.default.fileExists(atPath: store.imageURL(for: item).path))
+        store.markPurchased(item)
+        XCTAssertTrue(store.items.first?.isPurchased ?? false)
+        XCTAssertEqual(ShoppingStore(directory: directory).items.first?.name, "Onitsuka Tiger")
     }
 }
 

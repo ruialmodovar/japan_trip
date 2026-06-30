@@ -260,7 +260,7 @@ struct PhotoJournalView: View {
     }
 }
 
-private struct CameraCaptureView: UIViewControllerRepresentable {
+struct CameraCaptureView: UIViewControllerRepresentable {
     @Environment(\.dismiss) private var dismiss
     let onCapture: (UIImage) -> Void
 

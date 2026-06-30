@@ -16,6 +16,8 @@ final class AppNavigationState: ObservableObject {
     @Published var showsNotifications = false
     @Published var showsDocumentVault = false
     @Published var showsLocationSharing = false
+    @Published var showsExpenses = false
+    @Published var showsShopping = false
     @Published private(set) var homeRequestID = 0
 
     func goHome() {
@@ -28,6 +30,8 @@ final class AppNavigationState: ObservableObject {
         showsNotifications = false
         showsDocumentVault = false
         showsLocationSharing = false
+        showsExpenses = false
+        showsShopping = false
         selectedTab = .today
         homeRequestID += 1
     }
@@ -91,6 +95,14 @@ struct RootView: View {
             NavigationStack { LocationSharingView() }
                 .environmentObject(navigation)
         }
+        .sheet(isPresented: $navigation.showsExpenses) {
+            NavigationStack { ExpensesView() }
+                .environmentObject(navigation)
+        }
+        .sheet(isPresented: $navigation.showsShopping) {
+            NavigationStack { ShoppingView() }
+                .environmentObject(navigation)
+        }
     }
 }
 
@@ -142,6 +154,16 @@ private struct AppMenuToolbarModifier: ViewModifier {
                         navigation.showsLocationSharing = true
                     } label: {
                         Label("Localização do grupo", systemImage: "location.fill.viewfinder")
+                    }
+                    Button {
+                        navigation.showsExpenses = true
+                    } label: {
+                        Label("Despesas", systemImage: "wallet.bifold.fill")
+                    }
+                    Button {
+                        navigation.showsShopping = true
+                    } label: {
+                        Label("Compras", systemImage: "cart.fill")
                     }
                     Button {
                         navigation.showsPhotos = true
