@@ -53,6 +53,7 @@ struct TripExpense: Identifiable, Codable, Hashable {
     var payerEmail: String
     var participantEmails: Set<String>
     var note: String
+    var createdByEmail: String? = nil
 }
 
 @MainActor
@@ -61,6 +62,8 @@ final class ExpenseStore: ObservableObject {
     @Published private(set) var ratesPerBRL: [TripCurrency: Double] = [.BRL: 1, .AED: 0.68, .JPY: 27.5, .EUR: 0.16, .USD: 0.18]
     @Published private(set) var ratesUpdatedAt: Date?
     @Published private(set) var isRefreshingRates = false
+    @Published private(set) var isSyncing = false
+    @Published private(set) var lastSyncedAt: Date?
     @Published var errorMessage: String?
     @Published var dailyBudgetBRL: Double {
         didSet { UserDefaults.standard.set(dailyBudgetBRL, forKey: budgetKey) }
@@ -68,29 +71,80 @@ final class ExpenseStore: ObservableObject {
 
     private let directory: URL
     private let session: URLSession
+    private let sharingService: any TripSharingServicing
+    private weak var authentication: AuthenticationManager?
+    private var pendingDeletionIDs: Set<UUID> = []
+    private var pendingUploadIDs: Set<UUID> = []
     private let budgetKey = "expenses.dailyBudgetBRL"
     private let ratesKey = "expenses.exchangeRates"
     private let ratesDateKey = "expenses.exchangeRatesDate"
 
-    init(directory: URL? = nil, session: URLSession = .shared) {
+    init(
+        directory: URL? = nil,
+        session: URLSession = .shared,
+        sharingService: any TripSharingServicing = SupabaseTripSharingService()
+    ) {
         self.directory = directory ?? FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("JapanTripExpenses", isDirectory: true)
         self.session = session
+        self.sharingService = sharingService
         let savedBudget = UserDefaults.standard.double(forKey: budgetKey)
         self.dailyBudgetBRL = savedBudget > 0 ? savedBudget : 1_500
         try? FileManager.default.createDirectory(at: self.directory, withIntermediateDirectories: true)
         load()
     }
 
-    func add(_ expense: TripExpense) {
+    func configureSharing(authentication: AuthenticationManager) {
+        self.authentication = authentication
+    }
+
+    func add(_ newExpense: TripExpense) {
+        var expense = newExpense
+        expense.createdByEmail = expense.createdByEmail ?? authentication?.authenticatedEmail
         expenses.append(expense)
+        pendingUploadIDs.insert(expense.id)
         expenses.sort { $0.date > $1.date }
         save()
+        Task { await upload(expense) }
     }
 
     func delete(_ expense: TripExpense) {
         expenses.removeAll { $0.id == expense.id }
+        pendingUploadIDs.remove(expense.id)
+        pendingDeletionIDs.insert(expense.id)
         save()
+        Task { await flushDeletion(id: expense.id) }
+    }
+
+    func sync(authentication: AuthenticationManager) async {
+        configureSharing(authentication: authentication)
+        guard authentication.isAuthenticated, !isSyncing else { return }
+        isSyncing = true
+        defer { isSyncing = false }
+
+        do {
+            let token = try await authentication.accessTokenForAPI()
+            for id in pendingDeletionIDs {
+                try await sharingService.deleteExpense(id: id, accessToken: token)
+                pendingDeletionIDs.remove(id)
+            }
+            guard let userID = authentication.authenticatedUserID,
+                  let email = authentication.authenticatedEmail else { return }
+            for expense in expenses where pendingUploadIDs.contains(expense.id) {
+                try await sharingService.upsertExpense(
+                    expense, ownerUserID: userID,
+                    ownerEmail: expense.createdByEmail ?? email,
+                    accessToken: token
+                )
+                pendingUploadIDs.remove(expense.id)
+            }
+            expenses = try await sharingService.fetchExpenses(accessToken: token).sorted { $0.date > $1.date }
+            lastSyncedAt = Date()
+            errorMessage = nil
+            save()
+        } catch {
+            errorMessage = "Sem sincronização neste momento — as despesas continuam guardadas neste aparelho."
+        }
     }
 
     func amountInBRL(_ expense: TripExpense) -> Double {
@@ -156,6 +210,8 @@ final class ExpenseStore: ObservableObject {
     private func save() {
         guard let data = try? JSONEncoder().encode(expenses) else { return }
         try? data.write(to: expensesURL, options: [.atomic, .completeFileProtection])
+        UserDefaults.standard.set(pendingDeletionIDs.map(\.uuidString), forKey: pendingDeletionsKey)
+        UserDefaults.standard.set(pendingUploadIDs.map(\.uuidString), forKey: pendingUploadsKey)
     }
 
     private func load() {
@@ -167,6 +223,13 @@ final class ExpenseStore: ObservableObject {
             ratesPerBRL = decoded
         }
         ratesUpdatedAt = UserDefaults.standard.object(forKey: ratesDateKey) as? Date
+        pendingDeletionIDs = Set((UserDefaults.standard.stringArray(forKey: pendingDeletionsKey) ?? []).compactMap(UUID.init(uuidString:)))
+        if UserDefaults.standard.object(forKey: pendingUploadsKey) == nil {
+            // First version with cloud sharing: publish existing offline records once.
+            pendingUploadIDs = Set(expenses.map(\.id))
+        } else {
+            pendingUploadIDs = Set((UserDefaults.standard.stringArray(forKey: pendingUploadsKey) ?? []).compactMap(UUID.init(uuidString:)))
+        }
     }
 
     private func cacheRates() {
@@ -175,6 +238,39 @@ final class ExpenseStore: ObservableObject {
     }
 
     private var expensesURL: URL { directory.appendingPathComponent("expenses.json") }
+    private var pendingDeletionsKey: String { "expenses.pendingDeletions.\(directory.path)" }
+    private var pendingUploadsKey: String { "expenses.pendingUploads.\(directory.path)" }
+
+    private func upload(_ expense: TripExpense) async {
+        guard let authentication, authentication.isAuthenticated,
+              let userID = authentication.authenticatedUserID,
+              let email = authentication.authenticatedEmail else { return }
+        do {
+            let token = try await authentication.accessTokenForAPI()
+            try await sharingService.upsertExpense(
+                expense, ownerUserID: userID,
+                ownerEmail: expense.createdByEmail ?? email,
+                accessToken: token
+            )
+            pendingUploadIDs.remove(expense.id)
+            save()
+            lastSyncedAt = Date()
+        } catch {
+            errorMessage = "Despesa guardada no aparelho; será sincronizada quando houver internet."
+        }
+    }
+
+    private func flushDeletion(id: UUID) async {
+        guard let authentication, authentication.isAuthenticated else { return }
+        do {
+            let token = try await authentication.accessTokenForAPI()
+            try await sharingService.deleteExpense(id: id, accessToken: token)
+            pendingDeletionIDs.remove(id)
+            save()
+        } catch {
+            errorMessage = "A eliminação será sincronizada quando houver internet."
+        }
+    }
 }
 
 private struct ExchangeRateRecord: Decodable {
@@ -210,10 +306,17 @@ struct ExpensesView: View {
                 Button { dismiss(); navigation.goHome() } label: { Label("Início", systemImage: "house.fill") }
             }
             ToolbarItem(placement: .topBarTrailing) {
-                Button { showsAddExpense = true } label: { Image(systemName: "plus.circle.fill") }
+                HStack {
+                    Button { Task { await store.sync(authentication: authentication) } } label: {
+                        if store.isSyncing { ProgressView() } else { Image(systemName: "arrow.triangle.2.circlepath") }
+                    }
+                    .disabled(store.isSyncing)
+                    Button { showsAddExpense = true } label: { Image(systemName: "plus.circle.fill") }
+                }
             }
         }
         .task { await store.refreshRates() }
+        .task { await store.sync(authentication: authentication) }
         .sheet(isPresented: $showsAddExpense) {
             NavigationStack {
                 ExpenseEditorView(defaultDate: selectedDate, defaultPayer: authentication.authenticatedEmail ?? TripParticipant.all[0].email)
@@ -302,6 +405,13 @@ struct ExpensesView: View {
     private var expensesList: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("LANÇAMENTOS").font(.caption.bold()).tracking(1).foregroundStyle(.secondary)
+            Label(
+                store.lastSyncedAt.map { "Partilhado com o grupo · \($0.formatted(.relative(presentation: .named)))" }
+                    ?? "Sincroniza com os participantes via Supabase",
+                systemImage: "person.3.fill"
+            )
+            .font(.caption)
+            .foregroundStyle(.secondary)
             if store.expenses.isEmpty {
                 ContentUnavailableView("Nenhuma despesa", systemImage: "creditcard", description: Text("Toque em + para registar o primeiro gasto."))
             } else {

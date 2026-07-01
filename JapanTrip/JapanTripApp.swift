@@ -31,6 +31,7 @@ struct JapanTripApp: App {
                 .environmentObject(shopping)
                 .preferredColorScheme(.light)
                 .task {
+                    await authentication.authenticateAutomatically()
                     await notifications.refreshStatus()
                     if notifications.authorizationStatus == .authorized {
                         await notifications.enableAndSchedule(weatherSnapshots: weather.snapshots)
@@ -38,7 +39,13 @@ struct JapanTripApp: App {
                 }
                 .onChange(of: authentication.isAuthenticated) { _, signedIn in
                     if signedIn {
+                        expenses.configureSharing(authentication: authentication)
+                        photoJournal.configureSharing(authentication: authentication)
                         locationSharing.resumeIfNeeded(authentication: authentication)
+                        Task {
+                            await expenses.sync(authentication: authentication)
+                            await photoJournal.sync(authentication: authentication)
+                        }
                     } else {
                         locationSharing.pauseUpdates()
                     }
@@ -49,8 +56,13 @@ struct JapanTripApp: App {
                 authentication.lockIfAllowed()
                 documentVault.lock()
                 locationSharing.pauseUpdates()
-            } else if newPhase == .active, authentication.isAuthenticated {
-                locationSharing.resumeIfNeeded(authentication: authentication)
+            } else if newPhase == .active {
+                Task {
+                    await authentication.authenticateAutomatically()
+                    if authentication.isAuthenticated {
+                        locationSharing.resumeIfNeeded(authentication: authentication)
+                    }
+                }
             }
         }
     }

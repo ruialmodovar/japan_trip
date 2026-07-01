@@ -10,6 +10,15 @@ struct DetectedPrice: Hashable {
 }
 
 enum PriceOCRParser {
+    static func yenPrices(in text: String) -> [DetectedPrice] {
+        prices(in: text, defaultCurrency: .JPY)
+            .map { DetectedPrice(amount: $0.amount, currency: .JPY, sourceText: $0.sourceText) }
+            .reduce(into: [DetectedPrice]()) { result, candidate in
+                if !result.contains(where: { $0.amount == candidate.amount }) { result.append(candidate) }
+            }
+            .sorted { $0.amount > $1.amount }
+    }
+
     static func prices(in text: String, defaultCurrency: TripCurrency = .JPY) -> [DetectedPrice] {
         let normalized = text.replacingOccurrences(of: "，", with: ",")
         let patterns: [(String, TripCurrency)] = [
@@ -85,7 +94,7 @@ final class ShoppingStore: ObservableObject {
         load()
     }
 
-    func recognizePrices(in image: UIImage, defaultCurrency: TripCurrency = .JPY) async -> [DetectedPrice] {
+    func recognizePrices(in image: UIImage) async -> [DetectedPrice] {
         guard let cgImage = image.cgImage else { return [] }
         isRecognizing = true
         defer { isRecognizing = false }
@@ -98,7 +107,7 @@ final class ShoppingStore: ObservableObject {
             do {
                 try handler.perform([request])
                 let text = (request.results ?? []).compactMap { $0.topCandidates(1).first?.string }.joined(separator: "\n")
-                return PriceOCRParser.prices(in: text, defaultCurrency: defaultCurrency)
+                return PriceOCRParser.yenPrices(in: text)
             } catch { return [] }
         }.value
     }
@@ -108,7 +117,7 @@ final class ShoppingStore: ObservableObject {
         let id = UUID()
         let filename = "\(id.uuidString).jpg"
         try data.write(to: directory.appendingPathComponent(filename), options: [.atomic, .completeFileProtection])
-        items.insert(.init(id: id, name: name, photoFilename: filename, amount: amount, currency: currency, storeName: storeName, createdAt: Date(), taxFreeEnabled: taxFreeEnabled, isPurchased: false), at: 0)
+        items.insert(.init(id: id, name: name, photoFilename: filename, amount: amount, currency: .JPY, storeName: storeName, createdAt: Date(), taxFreeEnabled: taxFreeEnabled, isPurchased: false), at: 0)
         save()
     }
 
@@ -128,7 +137,13 @@ final class ShoppingStore: ObservableObject {
 
     private func load() {
         guard let data = try? Data(contentsOf: metadataURL), let decoded = try? JSONDecoder().decode([ShoppingItem].self, from: data) else { return }
-        items = decoded.filter { FileManager.default.fileExists(atPath: imageURL(for: $0).path) }
+        items = decoded.compactMap { saved in
+            guard FileManager.default.fileExists(atPath: imageURL(for: saved).path) else { return nil }
+            var migrated = saved
+            migrated.currency = .JPY
+            return migrated
+        }
+        save()
     }
 
     private func save() {
@@ -197,7 +212,7 @@ struct ShoppingView: View {
     private var hero: some View {
         VStack(alignment: .leading, spacing: 15) {
             Label("Conversor visual de preços", systemImage: "camera.viewfinder").font(.title2.bold())
-            Text("Fotografe o produto e a etiqueta. O reconhecimento acontece no iPhone e pode ser corrigido antes de guardar.")
+            Text("Fotografe o produto e a etiqueta. Todos os valores reconhecidos são tratados como ienes e convertidos automaticamente.")
                 .font(.subheadline).foregroundStyle(.secondary)
             HStack(spacing: 10) {
                 Button { showsCamera = true } label: { Label("Fotografar preço", systemImage: "camera.fill").frame(maxWidth: .infinity) }
@@ -232,7 +247,7 @@ struct ShoppingView: View {
         .contextMenu { Button("Eliminar", role: .destructive) { shopping.delete(item) } }
     }
 
-    private func adjustedAmount(_ item: ShoppingItem) -> Double { item.taxFreeEnabled && item.currency == .JPY ? item.amount / 1.10 : item.amount }
+    private func adjustedAmount(_ item: ShoppingItem) -> Double { item.taxFreeEnabled ? item.amount / 1.10 : item.amount }
     private func originalPrice(_ item: ShoppingItem) -> String { adjustedAmount(item).formatted(.currency(code: item.currency.rawValue)) + (item.taxFreeEnabled ? " tax-free*" : "") }
     private func converted(_ item: ShoppingItem, to currency: TripCurrency) -> String { expenses.converted(adjustedAmount(item), from: item.currency, to: currency).formatted(.currency(code: currency.rawValue)) }
 }
@@ -243,7 +258,6 @@ private struct ShoppingScanEditor: View {
     let image: UIImage
     @State private var name = ""
     @State private var amount = 0.0
-    @State private var currency: TripCurrency = .JPY
     @State private var storeName = ""
     @State private var taxFree = false
     @State private var candidates: [DetectedPrice] = []
@@ -255,18 +269,19 @@ private struct ShoppingScanEditor: View {
                 Section("Preço reconhecido") {
                     if shopping.isRecognizing { HStack { ProgressView(); Text("A ler a etiqueta…") } }
                     ForEach(candidates, id: \.self) { candidate in
-                        Button { amount = candidate.amount; currency = candidate.currency } label: {
-                            HStack { Text(candidate.sourceText); Spacer(); Text(candidate.amount.formatted(.currency(code: candidate.currency.rawValue))).bold() }
+                        Button { amount = candidate.amount } label: {
+                            HStack { Text(candidate.sourceText); Spacer(); Text(candidate.amount.formatted(.currency(code: "JPY"))).bold() }
                         }
                     }
-                    TextField("Valor", value: $amount, format: .number.precision(.fractionLength(0...2))).keyboardType(.decimalPad)
-                    Picker("Moeda", selection: $currency) { ForEach(TripCurrency.allCases) { Text($0.rawValue).tag($0) } }
+                    TextField("Valor em ienes", value: $amount, format: .number.precision(.fractionLength(0...2))).keyboardType(.decimalPad)
+                    Label("O valor será sempre guardado em JPY", systemImage: "yensign.circle.fill")
+                        .font(.caption).foregroundStyle(.secondary)
                 }
                 Section("Produto") {
                     TextField("Nome do produto", text: $name)
                     TextField("Loja opcional", text: $storeName)
-                    Toggle("Estimar tax-free japonês (10%)", isOn: $taxFree).disabled(currency != .JPY)
-                    if taxFree, currency == .JPY { Text("Estimativa: divide o preço com imposto por 1,10. Confirme sempre a etiqueta e elegibilidade da loja.").font(.caption).foregroundStyle(.secondary) }
+                    Toggle("Estimar tax-free japonês (10%)", isOn: $taxFree)
+                    if taxFree { Text("Estimativa: divide o preço com imposto por 1,10. Confirme sempre a etiqueta e elegibilidade da loja.").font(.caption).foregroundStyle(.secondary) }
                 }
             }
             .navigationTitle("Ler preço")
@@ -275,14 +290,14 @@ private struct ShoppingScanEditor: View {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancelar") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Guardar") {
-                        try? shopping.add(name: name, image: image, amount: amount, currency: currency, storeName: storeName, taxFreeEnabled: taxFree)
+                        try? shopping.add(name: name, image: image, amount: amount, currency: .JPY, storeName: storeName, taxFreeEnabled: taxFree)
                         dismiss()
                     }.disabled(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || amount <= 0)
                 }
             }
             .task {
                 candidates = await shopping.recognizePrices(in: image)
-                if let first = candidates.first { amount = first.amount; currency = first.currency }
+                if let first = candidates.first { amount = first.amount }
             }
         }
     }
@@ -295,7 +310,7 @@ private struct ShoppingItemDetail: View {
     @Environment(\.dismiss) private var dismiss
     let item: ShoppingItem
 
-    var adjustedAmount: Double { item.taxFreeEnabled && item.currency == .JPY ? item.amount / 1.10 : item.amount }
+    var adjustedAmount: Double { item.taxFreeEnabled ? item.amount / 1.10 : item.amount }
 
     var body: some View {
         NavigationStack {

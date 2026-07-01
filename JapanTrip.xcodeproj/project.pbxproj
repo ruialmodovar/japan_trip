@@ -26,12 +26,13 @@
 		A10000000000000000000017 /* SupabaseAuthService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000017 /* SupabaseAuthService.swift */; };
 		A10000000000000000000018 /* SecureSessionStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000018 /* SecureSessionStore.swift */; };
 		A10000000000000000000019 /* OfflineView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000019 /* OfflineView.swift */; };
+		A10000000000000000000020 /* JapanTripTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000020 /* JapanTripTests.swift */; };
 		A10000000000000000000022 /* NotificationsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000022 /* NotificationsView.swift */; };
 		A10000000000000000000023 /* DocumentVaultView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000023 /* DocumentVaultView.swift */; };
 		A10000000000000000000024 /* LocationSharingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000024 /* LocationSharingView.swift */; };
 		A10000000000000000000025 /* ExpensesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000025 /* ExpensesView.swift */; };
 		A10000000000000000000026 /* ShoppingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000026 /* ShoppingView.swift */; };
-		A10000000000000000000020 /* JapanTripTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000020 /* JapanTripTests.swift */; };
+		A10000000000000000000027 /* TripSharingService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000027 /* TripSharingService.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -65,13 +66,14 @@
 		B10000000000000000000017 /* SupabaseAuthService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupabaseAuthService.swift; sourceTree = "<group>"; };
 		B10000000000000000000018 /* SecureSessionStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SecureSessionStore.swift; sourceTree = "<group>"; };
 		B10000000000000000000019 /* OfflineView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OfflineView.swift; sourceTree = "<group>"; };
+		B10000000000000000000020 /* JapanTripTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JapanTripTests.swift; sourceTree = "<group>"; };
+		B10000000000000000000021 /* JapanTripTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = JapanTripTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		B10000000000000000000022 /* NotificationsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationsView.swift; sourceTree = "<group>"; };
 		B10000000000000000000023 /* DocumentVaultView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentVaultView.swift; sourceTree = "<group>"; };
 		B10000000000000000000024 /* LocationSharingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocationSharingView.swift; sourceTree = "<group>"; };
 		B10000000000000000000025 /* ExpensesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExpensesView.swift; sourceTree = "<group>"; };
 		B10000000000000000000026 /* ShoppingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShoppingView.swift; sourceTree = "<group>"; };
-		B10000000000000000000020 /* JapanTripTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JapanTripTests.swift; sourceTree = "<group>"; };
-		B10000000000000000000021 /* JapanTripTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = JapanTripTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		B10000000000000000000027 /* TripSharingService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TripSharingService.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -128,6 +130,7 @@
 				B10000000000000000000024 /* LocationSharingView.swift */,
 				B10000000000000000000025 /* ExpensesView.swift */,
 				B10000000000000000000026 /* ShoppingView.swift */,
+				B10000000000000000000027 /* TripSharingService.swift */,
 			);
 			path = JapanTrip;
 			sourceTree = "<group>";
@@ -271,6 +274,7 @@
 				A10000000000000000000024 /* LocationSharingView.swift in Sources */,
 				A10000000000000000000025 /* ExpensesView.swift in Sources */,
 				A10000000000000000000026 /* ShoppingView.swift in Sources */,
+				A10000000000000000000027 /* TripSharingService.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -351,7 +355,7 @@
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = UIInterfaceOrientationPortrait;
-				MARKETING_VERSION = 1.3;
+				MARKETING_VERSION = 1.4;
 				PRODUCT_BUNDLE_IDENTIFIER = com.ruicoelho;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
@@ -379,7 +383,7 @@
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = UIInterfaceOrientationPortrait;
-				MARKETING_VERSION = 1.3;
+				MARKETING_VERSION = 1.4;
 				PRODUCT_BUNDLE_IDENTIFIER = com.ruicoelho;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";

@@ -52,13 +52,15 @@ O cofre importa PDFs, imagens, passaportes, seguros, bilhetes, reservas e QR Cod
 
 Cada participante pode ativar ou desligar voluntariamente a partilha de localização aproximada. O app usa permissão `When In Use`, atualiza apenas enquanto está aberto e remove o ponto do Supabase quando a partilha é desligada. O mapa mostra o nome e a hora da última atualização. Antes de usar, execute `supabase/location_sharing.sql` no SQL Editor do projeto para criar a tabela e as políticas RLS restritas aos seis e-mails.
 
+As despesas e fotografias também podem ser partilhadas entre os participantes, mantendo cópias locais para funcionamento offline. Execute `supabase/trip_sharing.sql` no SQL Editor do Supabase para criar as tabelas, o bucket privado de fotografias e as respetivas políticas RLS. As fotos só podem ser alteradas ou eliminadas pelo participante que as publicou.
+
 ## Despesas
 
 O módulo de despesas regista valores em BRL, AED e JPY, converte automaticamente com taxas Frankfurter guardadas para uso offline, acompanha o orçamento diário do grupo e divide cada lançamento entre participantes selecionados. Os saldos indicam quanto cada pessoa deve ou tem a receber. Os lançamentos ficam protegidos localmente pelo sistema de proteção de ficheiros do iOS.
 
 ## Compras
 
-O menu Compras fotografa produtos e etiquetas, usa Vision OCR local para reconhecer preços em JPY, AED, BRL, EUR ou USD e apresenta conversões imediatas para real, euro e dólar. O valor e a moeda podem ser corrigidos antes de guardar, existe uma estimativa opcional de tax-free japonês e o botão Comprei cria diretamente um lançamento no módulo Despesas.
+O menu Compras fotografa produtos e etiquetas, usa Vision OCR local e assume sempre que os valores reconhecidos estão em ienes japoneses. O valor pode ser corrigido antes de guardar e é convertido imediatamente para real, euro e dólar. Existe uma estimativa opcional de tax-free japonês e o botão Comprei cria diretamente um lançamento no módulo Despesas.
 
 ## Privacidade
 

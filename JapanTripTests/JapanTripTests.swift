@@ -155,6 +155,41 @@ final class AuthenticationAndNavigationTests: XCTestCase {
         XCTAssertFalse(unauthorizedResult)
     }
 
+    func testTrustedSessionAvoidsBiometricsForTwelveHours() async {
+        let sessionStore = InMemorySessionStore()
+        var currentDate = Date(timeIntervalSince1970: 1_800_000_000)
+        let authentication = AuthenticationManager(
+            authService: MockSupabaseAuthService(),
+            sessionStore: sessionStore,
+            now: { currentDate }
+        )
+
+        XCTAssertFalse(authentication.shouldAuthenticateAutomatically)
+
+        let loginSucceeded = await authentication.authenticate(
+            email: "ruialmodovar@gmail.com",
+            password: "valid-test-password"
+        )
+        XCTAssertTrue(loginSucceeded)
+        XCTAssertFalse(authentication.shouldAuthenticateAutomatically)
+
+        authentication.lock()
+        XCTAssertFalse(authentication.shouldAuthenticateAutomatically)
+        await authentication.authenticateAutomatically()
+        XCTAssertTrue(authentication.isAuthenticated)
+
+        let restoredWithinWindow = AuthenticationManager(
+            authService: MockSupabaseAuthService(),
+            sessionStore: sessionStore,
+            now: { currentDate.addingTimeInterval(11 * 60 * 60) }
+        )
+        XCTAssertTrue(restoredWithinWindow.isAuthenticated)
+
+        currentDate.addTimeInterval(13 * 60 * 60)
+        authentication.lock()
+        XCTAssertTrue(authentication.shouldAuthenticateAutomatically)
+    }
+
     func testHomeResetsNavigationState() {
         let navigation = AppNavigationState()
         navigation.selectedTab = .checklist
@@ -363,6 +398,12 @@ final class PriceOCRParserTests: XCTestCase {
         XCTAssertEqual(prices.first?.currency, .JPY)
         XCTAssertEqual(prices.first?.amount, 9_800)
     }
+
+    func testShoppingAlwaysTreatsDetectedValuesAsYen() {
+        let prices = PriceOCRParser.yenPrices(in: "PRICE $120.00\nSALE 9,800")
+        XCTAssertTrue(prices.allSatisfy { $0.currency == .JPY })
+        XCTAssertTrue(prices.contains { $0.amount == 120 })
+    }
 }
 
 @MainActor
@@ -410,10 +451,17 @@ private struct MockSupabaseAuthService: SupabaseAuthenticating {
 
 private final class InMemorySessionStore: SecureSessionStoring {
     private var session: SupabaseSession?
+    private var trustedUntil: Date?
 
     func load() -> SupabaseSession? { session }
     func save(_ session: SupabaseSession) throws { self.session = session }
-    func clear() { session = nil }
+    func loadTrustedUntil() -> Date? { trustedUntil }
+    func saveTrustedUntil(_ date: Date) throws { trustedUntil = date }
+    func clearTrustedUntil() { trustedUntil = nil }
+    func clear() {
+        session = nil
+        trustedUntil = nil
+    }
 }
 
 @MainActor
@@ -431,8 +479,8 @@ final class PhotoJournalTests: XCTestCase {
         store = nil
     }
 
-    func testCaptureCaptionPersistenceAndDeletion() {
-        store.saveCapturedImage(makeTestImage())
+    func testCaptureCaptionPersistenceAndDeletion() async {
+        await store.saveCapturedImage(makeTestImage())
         XCTAssertEqual(store.entries.count, 1)
 
         let entry = try! XCTUnwrap(store.entries.first)
@@ -447,6 +495,16 @@ final class PhotoJournalTests: XCTestCase {
         store.delete(store.entries[0])
         XCTAssertTrue(store.entries.isEmpty)
         XCTAssertFalse(FileManager.default.fileExists(atPath: store.imageURL(for: entry).path))
+    }
+
+    func testSharedPhotoStoragePathMatchesLowercaseSupabaseUserID() {
+        let userID = UUID(uuidString: "28A8A9D6-296F-4426-8DA9-7089BA9E0F24")!
+        let photoID = UUID(uuidString: "AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE")!
+
+        XCTAssertEqual(
+            PhotoJournalStore.storagePath(userID: userID, photoID: photoID),
+            "28a8a9d6-296f-4426-8da9-7089ba9e0f24/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee.jpg"
+        )
     }
 
     private func makeTestImage() -> UIImage {

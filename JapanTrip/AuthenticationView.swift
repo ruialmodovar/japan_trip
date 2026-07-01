@@ -12,18 +12,33 @@ final class AuthenticationManager: ObservableObject {
     private let sessionStore: any SecureSessionStoring
     private var currentSession: SupabaseSession?
     private var lockSuppressionReasons: Set<String> = []
+    private var lastAutomaticBiometricAttempt: Date?
+    private var trustedUntil: Date?
+    private let sessionLifetime: TimeInterval
+    private let now: () -> Date
 
     init(
         authService: any SupabaseAuthenticating = SupabaseAuthService(),
-        sessionStore: any SecureSessionStoring = KeychainSessionStore()
+        sessionStore: any SecureSessionStoring = KeychainSessionStore(),
+        sessionLifetime: TimeInterval = 12 * 60 * 60,
+        now: @escaping () -> Date = Date.init
     ) {
         self.authService = authService
         self.sessionStore = sessionStore
+        self.sessionLifetime = sessionLifetime
+        self.now = now
         authenticatedEmail = nil
         currentSession = sessionStore.load()
         let email = currentSession?.user.email?.lowercased()
         if let email, TripParticipant.participant(for: email) != nil {
             authenticatedEmail = email
+            trustedUntil = sessionStore.loadTrustedUntil()
+            if hasValidTrustedSession {
+                isAuthenticated = true
+            } else {
+                trustedUntil = nil
+                sessionStore.clearTrustedUntil()
+            }
         } else if currentSession != nil {
             sessionStore.clear()
             currentSession = nil
@@ -31,6 +46,9 @@ final class AuthenticationManager: ObservableObject {
     }
 
     var canUseBiometrics: Bool { authenticatedEmail != nil && currentSession != nil }
+    var shouldAuthenticateAutomatically: Bool {
+        canUseBiometrics && !hasValidTrustedSession && !isAuthenticated && !isAuthenticating
+    }
     var authenticatedName: String? {
         authenticatedEmail.flatMap { TripParticipant.participant(for: $0)?.name }
     }
@@ -76,6 +94,7 @@ final class AuthenticationManager: ObservableObject {
             if success {
                 try await restoreSupabaseSession()
                 isAuthenticated = true
+                extendTrustedSession()
             }
         } catch let error as LAError {
             if error.code != .userCancel && error.code != .systemCancel && error.code != .appCancel {
@@ -87,11 +106,35 @@ final class AuthenticationManager: ObservableObject {
             // A sessão foi validada anteriormente pelo Supabase e está protegida
             // pelo Keychain + biometria. Permite consultar o roteiro sem rede.
             isAuthenticated = currentSession != nil
+            if isAuthenticated { extendTrustedSession() }
             errorMessage = isAuthenticated ? nil : "Sem ligação para validar a sessão."
         } catch {
             errorMessage = "Não foi possível validar a sessão. Verifique a ligação à internet."
         }
         isAuthenticating = false
+    }
+
+    /// Presents Face ID as soon as the app becomes active when a previously
+    /// validated Supabase session is available in the Keychain.
+    func authenticateAutomatically() async {
+        if hasValidTrustedSession {
+            isAuthenticated = true
+            errorMessage = nil
+            return
+        }
+        if isAuthenticated {
+            lock()
+        }
+        guard shouldAuthenticateAutomatically else { return }
+
+        // The initial view task and the scene activation can arrive almost at
+        // the same time. Avoid showing a second biometric prompt for one open.
+        if let lastAutomaticBiometricAttempt,
+           Date().timeIntervalSince(lastAutomaticBiometricAttempt) < 2 {
+            return
+        }
+        lastAutomaticBiometricAttempt = Date()
+        await authenticate()
     }
 
     @discardableResult
@@ -115,6 +158,7 @@ final class AuthenticationManager: ObservableObject {
             currentSession = session
             authenticatedEmail = normalizedEmail
             isAuthenticated = true
+            extendTrustedSession()
             return true
         } catch let error as SupabaseAuthError {
             errorMessage = error.localizedDescription
@@ -128,6 +172,7 @@ final class AuthenticationManager: ObservableObject {
         isAuthenticated = false
         isAuthenticating = false
         errorMessage = nil
+        lastAutomaticBiometricAttempt = nil
     }
 
     func signOut() {
@@ -143,6 +188,7 @@ final class AuthenticationManager: ObservableObject {
 
     func lockIfAllowed() {
         guard lockSuppressionReasons.isEmpty else { return }
+        guard !hasValidTrustedSession else { return }
         lock()
     }
 
@@ -175,6 +221,17 @@ final class AuthenticationManager: ObservableObject {
         try sessionStore.save(session)
         currentSession = session
         authenticatedEmail = email
+    }
+
+    private var hasValidTrustedSession: Bool {
+        guard currentSession != nil, let trustedUntil else { return false }
+        return trustedUntil > now()
+    }
+
+    private func extendTrustedSession() {
+        let expiration = now().addingTimeInterval(sessionLifetime)
+        trustedUntil = expiration
+        try? sessionStore.saveTrustedUntil(expiration)
     }
 
     func accessTokenForAPI() async throws -> String {
@@ -320,7 +377,7 @@ private struct AuthenticationView: View {
         }
         .task {
             if auth.canUseBiometrics {
-                await auth.authenticate()
+                await auth.authenticateAutomatically()
             } else {
                 focusedField = .email
             }

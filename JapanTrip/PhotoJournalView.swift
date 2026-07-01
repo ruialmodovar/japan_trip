@@ -7,21 +7,36 @@ struct PhotoJournalEntry: Identifiable, Codable, Hashable {
     let filename: String
     let createdAt: Date
     var caption: String
+    var authorEmail: String? = nil
+    var remotePath: String? = nil
 }
 
 @MainActor
 final class PhotoJournalStore: ObservableObject {
     @Published private(set) var entries: [PhotoJournalEntry] = []
     @Published private(set) var isImporting = false
+    @Published private(set) var isSyncing = false
+    @Published private(set) var lastSyncedAt: Date?
     @Published var errorMessage: String?
 
     private let fileManager = FileManager.default
     private let metadataFilename = "photo-journal.json"
     private let customJournalDirectory: URL?
+    private let sharingService: any TripSharingServicing
+    private weak var authentication: AuthenticationManager?
+    private var pendingDeletions: [PendingPhotoDeletion] = []
 
-    init(directory: URL? = nil) {
+    init(
+        directory: URL? = nil,
+        sharingService: any TripSharingServicing = SupabaseTripSharingService()
+    ) {
         customJournalDirectory = directory
+        self.sharingService = sharingService
         loadMetadata()
+    }
+
+    func configureSharing(authentication: AuthenticationManager) {
+        self.authentication = authentication
     }
 
     func importPhotos(_ items: [PhotosPickerItem]) async {
@@ -39,7 +54,13 @@ final class PhotoJournalStore: ObservableObject {
                 let id = UUID()
                 let filename = "\(id.uuidString).jpg"
                 try jpeg.write(to: journalDirectory.appendingPathComponent(filename), options: .atomic)
-                entries.insert(.init(id: id, filename: filename, createdAt: Date(), caption: ""), at: 0)
+                let entry = PhotoJournalEntry(
+                    id: id, filename: filename, createdAt: Date(), caption: "",
+                    authorEmail: authentication?.authenticatedEmail
+                )
+                entries.insert(entry, at: 0)
+                saveMetadata()
+                await upload(entry)
             }
             saveMetadata()
         } catch {
@@ -47,7 +68,7 @@ final class PhotoJournalStore: ObservableObject {
         }
     }
 
-    func saveCapturedImage(_ image: UIImage) {
+    func saveCapturedImage(_ image: UIImage) async {
         errorMessage = nil
         do {
             try fileManager.createDirectory(at: journalDirectory, withIntermediateDirectories: true)
@@ -57,8 +78,13 @@ final class PhotoJournalStore: ObservableObject {
             let id = UUID()
             let filename = "\(id.uuidString).jpg"
             try jpeg.write(to: journalDirectory.appendingPathComponent(filename), options: .atomic)
-            entries.insert(.init(id: id, filename: filename, createdAt: Date(), caption: ""), at: 0)
+            let entry = PhotoJournalEntry(
+                id: id, filename: filename, createdAt: Date(), caption: "",
+                authorEmail: authentication?.authenticatedEmail
+            )
+            entries.insert(entry, at: 0)
             saveMetadata()
+            await upload(entry)
         } catch {
             errorMessage = "Não foi possível guardar a fotografia tirada."
         }
@@ -67,13 +93,69 @@ final class PhotoJournalStore: ObservableObject {
     func updateCaption(for entry: PhotoJournalEntry, caption: String) {
         guard let index = entries.firstIndex(where: { $0.id == entry.id }) else { return }
         entries[index].caption = caption
+        let updatedEntry = entries[index]
         saveMetadata()
+        Task { await updateRemoteMetadata(for: updatedEntry) }
     }
 
     func delete(_ entry: PhotoJournalEntry) {
         try? fileManager.removeItem(at: imageURL(for: entry))
         entries.removeAll { $0.id == entry.id }
+        if let path = entry.remotePath {
+            pendingDeletions.append(.init(id: entry.id, path: path))
+        }
         saveMetadata()
+        Task { await flushDeletions() }
+    }
+
+    func canModify(_ entry: PhotoJournalEntry) -> Bool {
+        entry.authorEmail == nil || entry.authorEmail == authentication?.authenticatedEmail
+    }
+
+    func sync(authentication: AuthenticationManager) async {
+        configureSharing(authentication: authentication)
+        guard authentication.isAuthenticated, !isSyncing else { return }
+        isSyncing = true
+        errorMessage = nil
+        defer { isSyncing = false }
+
+        do {
+            await flushDeletions()
+            for entry in entries where entry.remotePath == nil {
+                await upload(entry)
+            }
+            let token = try await authentication.accessTokenForAPI()
+            let remoteRecords = try await sharingService.fetchPhotos(accessToken: token)
+            try fileManager.createDirectory(at: journalDirectory, withIntermediateDirectories: true)
+            let remoteIDs = Set(remoteRecords.map(\.id))
+            let removedRemotely = entries.filter { $0.remotePath != nil && !remoteIDs.contains($0.id) }
+            for entry in removedRemotely {
+                try? fileManager.removeItem(at: imageURL(for: entry))
+            }
+            entries.removeAll { $0.remotePath != nil && !remoteIDs.contains($0.id) }
+            for record in remoteRecords {
+                guard !pendingDeletions.contains(where: { $0.id == record.id }) else { continue }
+                if let index = entries.firstIndex(where: { $0.id == record.id }) {
+                    entries[index].caption = record.caption
+                    entries[index].authorEmail = record.ownerEmail
+                    entries[index].remotePath = record.storagePath
+                } else {
+                    let filename = "\(record.id.uuidString).jpg"
+                    let data = try await sharingService.downloadPhoto(path: record.storagePath, accessToken: token)
+                    try data.write(to: journalDirectory.appendingPathComponent(filename), options: .atomic)
+                    entries.append(.init(
+                        id: record.id, filename: filename, createdAt: record.createdAt,
+                        caption: record.caption, authorEmail: record.ownerEmail,
+                        remotePath: record.storagePath
+                    ))
+                }
+            }
+            entries.sort { $0.createdAt > $1.createdAt }
+            lastSyncedAt = Date()
+            saveMetadata()
+        } catch {
+            errorMessage = "Sem sincronização neste momento — as fotografias continuam guardadas neste aparelho."
+        }
     }
 
     func imageURL(for entry: PhotoJournalEntry) -> URL {
@@ -92,6 +174,9 @@ final class PhotoJournalStore: ObservableObject {
         guard let data = try? Data(contentsOf: metadataURL),
               let saved = try? JSONDecoder().decode([PhotoJournalEntry].self, from: data) else { return }
         entries = saved.filter { fileManager.fileExists(atPath: imageURL(for: $0).path) }
+        if let data = try? Data(contentsOf: pendingDeletionsURL) {
+            pendingDeletions = (try? JSONDecoder().decode([PendingPhotoDeletion].self, from: data)) ?? []
+        }
     }
 
     private func saveMetadata() {
@@ -99,10 +184,79 @@ final class PhotoJournalStore: ObservableObject {
             try fileManager.createDirectory(at: journalDirectory, withIntermediateDirectories: true)
             let data = try JSONEncoder().encode(entries)
             try data.write(to: metadataURL, options: .atomic)
+            let deletions = try JSONEncoder().encode(pendingDeletions)
+            try deletions.write(to: pendingDeletionsURL, options: .atomic)
         } catch {
             errorMessage = "Não foi possível atualizar o diário fotográfico."
         }
     }
+
+    private var pendingDeletionsURL: URL { journalDirectory.appendingPathComponent("pending-photo-deletions.json") }
+
+    private func upload(_ entry: PhotoJournalEntry) async {
+        guard let authentication, authentication.isAuthenticated,
+              let userID = authentication.authenticatedUserID,
+              let email = authentication.authenticatedEmail,
+              let data = try? Data(contentsOf: imageURL(for: entry)) else { return }
+        let path = Self.storagePath(userID: userID, photoID: entry.id)
+        do {
+            let token = try await authentication.accessTokenForAPI()
+            try await sharingService.uploadPhoto(data, path: path, accessToken: token)
+            let record = SharedPhotoRecord(
+                id: entry.id, ownerUserID: userID, ownerEmail: email,
+                storagePath: path, caption: entry.caption, createdAt: entry.createdAt
+            )
+            try await sharingService.upsertPhoto(record, accessToken: token)
+            if let index = entries.firstIndex(where: { $0.id == entry.id }) {
+                entries[index].authorEmail = email
+                entries[index].remotePath = path
+                saveMetadata()
+            }
+            lastSyncedAt = Date()
+        } catch {
+            errorMessage = "A fotografia ficou guardada no aparelho, mas o Supabase respondeu: \(error.localizedDescription)"
+        }
+    }
+
+    private func updateRemoteMetadata(for entry: PhotoJournalEntry) async {
+        guard let authentication, authentication.isAuthenticated,
+              let userID = authentication.authenticatedUserID,
+              let email = authentication.authenticatedEmail,
+              let path = entry.remotePath,
+              canModify(entry) else { return }
+        do {
+            let token = try await authentication.accessTokenForAPI()
+            try await sharingService.upsertPhoto(.init(
+                id: entry.id, ownerUserID: userID, ownerEmail: email,
+                storagePath: path, caption: entry.caption, createdAt: entry.createdAt
+            ), accessToken: token)
+        } catch {
+            errorMessage = "Legenda guardada no aparelho; será sincronizada mais tarde."
+        }
+    }
+
+    private func flushDeletions() async {
+        guard let authentication, authentication.isAuthenticated else { return }
+        do {
+            let token = try await authentication.accessTokenForAPI()
+            for deletion in pendingDeletions {
+                try await sharingService.deletePhoto(id: deletion.id, path: deletion.path, accessToken: token)
+                pendingDeletions.removeAll { $0.id == deletion.id }
+            }
+            saveMetadata()
+        } catch {
+            errorMessage = "A eliminação será sincronizada quando houver internet."
+        }
+    }
+
+    static func storagePath(userID: UUID, photoID: UUID) -> String {
+        "\(userID.uuidString.lowercased())/\(photoID.uuidString.lowercased()).jpg"
+    }
+}
+
+private struct PendingPhotoDeletion: Codable, Hashable {
+    let id: UUID
+    let path: String
 }
 
 struct PhotoJournalView: View {
@@ -139,6 +293,12 @@ struct PhotoJournalView: View {
             }
             ToolbarItemGroup(placement: .topBarTrailing) {
                 Button {
+                    Task { await journal.sync(authentication: authentication) }
+                } label: {
+                    if journal.isSyncing { ProgressView() } else { Image(systemName: "arrow.triangle.2.circlepath") }
+                }
+                .disabled(journal.isSyncing)
+                Button {
                     showsCamera = true
                 } label: {
                     Image(systemName: "camera.fill").accessibilityLabel("Abrir câmera")
@@ -165,19 +325,22 @@ struct PhotoJournalView: View {
         .onChange(of: showsCamera) { _, isPresented in
             authentication.suppressAutoLock("camera", while: isPresented)
         }
+        .onAppear {
+            journal.configureSharing(authentication: authentication)
+        }
         .sheet(item: $selectedEntry) { entry in
             PhotoDetailView(entry: entry)
                 .environmentObject(journal)
         }
         .fullScreenCover(isPresented: $showsCamera) {
             CameraCaptureView { image in
-                journal.saveCapturedImage(image)
+                Task { await journal.saveCapturedImage(image) }
             }
             .ignoresSafeArea()
         }
         .overlay {
-            if journal.isImporting {
-                ProgressView("A guardar fotografias…")
+            if journal.isImporting || journal.isSyncing {
+                ProgressView(journal.isSyncing ? "A sincronizar fotografias…" : "A guardar fotografias…")
                     .padding(22)
                     .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 18))
             }
@@ -185,6 +348,15 @@ struct PhotoJournalView: View {
         .onDisappear {
             authentication.suppressAutoLock("photo-library", while: false)
             authentication.suppressAutoLock("camera", while: false)
+        }
+        .task { await journal.sync(authentication: authentication) }
+        .alert("Sincronização de fotografias", isPresented: Binding(
+            get: { journal.errorMessage != nil },
+            set: { if !$0 { journal.errorMessage = nil } }
+        )) {
+            Button("OK") { journal.errorMessage = nil }
+        } message: {
+            Text(journal.errorMessage ?? "")
         }
     }
 
@@ -232,7 +404,7 @@ struct PhotoJournalView: View {
                 HStack {
                     VStack(alignment: .leading, spacing: 3) {
                         Text("Memórias da viagem").font(.title2.bold())
-                        Text("\(journal.entries.count) fotografias guardadas neste aparelho").font(.caption).foregroundStyle(.secondary)
+                        Text("\(journal.entries.count) fotografias · partilhadas com o grupo").font(.caption).foregroundStyle(.secondary)
                     }
                     Spacer()
                 }
@@ -248,8 +420,10 @@ struct PhotoJournalView: View {
                         }
                         .buttonStyle(.plain)
                         .contextMenu {
-                            Button(role: .destructive) { journal.delete(entry) } label: {
-                                Label("Apagar", systemImage: "trash")
+                            if journal.canModify(entry) {
+                                Button(role: .destructive) { journal.delete(entry) } label: {
+                                    Label("Apagar", systemImage: "trash")
+                                }
                             }
                         }
                     }
@@ -342,6 +516,13 @@ private struct PhotoDetailView: View {
                         TextField("O que tornou este momento especial?", text: $caption, axis: .vertical)
                             .lineLimit(3...6)
                             .textFieldStyle(.roundedBorder)
+                            .disabled(!journal.canModify(entry))
+                        if let email = entry.authorEmail,
+                           let participant = TripParticipant.participant(for: email) {
+                            Label("Fotografia de \(participant.name)", systemImage: "person.crop.circle")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
                         Text(entry.createdAt.formatted(.dateTime.day().month(.wide).year().hour().minute().locale(Locale(identifier: "pt_BR"))))
                             .font(.caption)
                             .foregroundStyle(.secondary)
@@ -353,9 +534,11 @@ private struct PhotoDetailView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Guardar") {
-                        journal.updateCaption(for: entry, caption: caption)
-                        dismiss()
+                    if journal.canModify(entry) {
+                        Button("Guardar") {
+                            journal.updateCaption(for: entry, caption: caption)
+                            dismiss()
+                        }
                     }
                 }
                 ToolbarItem(placement: .cancellationAction) {
