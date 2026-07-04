@@ -12,6 +12,7 @@ final class DiaryVoiceRecorder: ObservableObject {
     private var recognitionRequest: SFSpeechAudioBufferRecognitionRequest?
     private var recognitionTask: SFSpeechRecognitionTask?
     private var transcriptBeforeRecording = ""
+    private var hasInstalledTap = false
     private let recognizer = SFSpeechRecognizer(locale: Locale(identifier: "pt-BR"))
 
     func toggleRecording() async {
@@ -20,12 +21,15 @@ final class DiaryVoiceRecorder: ObservableObject {
             errorMessage = "Ativa o Microfone e o Reconhecimento de Fala nas Definições para usar o ditado."
             return
         }
-        start()
+        await start()
     }
 
     func stop() {
         audioEngine.stop()
-        audioEngine.inputNode.removeTap(onBus: 0)
+        if hasInstalledTap {
+            audioEngine.inputNode.removeTap(onBus: 0)
+            hasInstalledTap = false
+        }
         recognitionRequest?.endAudio()
         recognitionTask?.cancel()
         recognitionRequest = nil
@@ -34,13 +38,17 @@ final class DiaryVoiceRecorder: ObservableObject {
         try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
     }
 
-    private func start() {
+    private func start() async {
         stop()
         transcriptBeforeRecording = transcript.trimmingCharacters(in: .whitespacesAndNewlines)
         do {
             let session = AVAudioSession.sharedInstance()
             try session.setCategory(.record, mode: .measurement, options: .duckOthers)
             try session.setActive(true, options: .notifyOthersOnDeactivation)
+            guard session.isInputAvailable else { throw DiaryRecordingError.inputUnavailable }
+
+            // Dá tempo ao iOS para estabilizar a rota depois de ativar a sessão.
+            try await Task.sleep(for: .milliseconds(120))
 
             let request = SFSpeechAudioBufferRecognitionRequest()
             request.shouldReportPartialResults = true
@@ -49,9 +57,13 @@ final class DiaryVoiceRecorder: ObservableObject {
 
             let input = audioEngine.inputNode
             let format = input.outputFormat(forBus: 0)
+            guard format.sampleRate > 0, format.channelCount > 0 else {
+                throw DiaryRecordingError.invalidAudioFormat
+            }
             input.installTap(onBus: 0, bufferSize: 1_024, format: format) { buffer, _ in
                 request.append(buffer)
             }
+            hasInstalledTap = true
             audioEngine.prepare()
             try audioEngine.start()
             isRecording = true
@@ -86,6 +98,20 @@ final class DiaryVoiceRecorder: ObservableObject {
     deinit {
         recognitionTask?.cancel()
         if audioEngine.isRunning { audioEngine.stop() }
+    }
+}
+
+private enum DiaryRecordingError: LocalizedError {
+    case inputUnavailable
+    case invalidAudioFormat
+
+    var errorDescription: String? {
+        switch self {
+        case .inputUnavailable:
+            "O microfone não está disponível. Verifica a entrada de áudio do aparelho."
+        case .invalidAudioFormat:
+            "O microfone ainda não está pronto. Desliga auscultadores Bluetooth, volta a abrir o diário e tenta novamente."
+        }
     }
 }
 
