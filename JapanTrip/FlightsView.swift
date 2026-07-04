@@ -1,5 +1,13 @@
 import SwiftUI
 
+struct FlightSeatAssignment: Identifiable, Hashable {
+    let passengerName: String
+    let seat: String
+    let cabin: String
+
+    var id: String { passengerName }
+}
+
 struct FlightLeg: Identifiable, Hashable {
     let id: String
     let flightNumber: String
@@ -13,13 +21,24 @@ struct FlightLeg: Identifiable, Hashable {
     let duration: String
     let aircraftNote: String?
     let isDateConfirmed: Bool
+    let seats: [FlightSeatAssignment]
 
     static let trip: [FlightLeg] = [
-        .init(id: "EK262", flightNumber: "EK262", dateText: "Qua, 8 jul", departureAirport: "GRU", departureCity: "São Paulo", departureTime: "01:05", arrivalAirport: "DXB", arrivalCity: "Dubai", arrivalTime: "23:00", duration: "14h55", aircraftNote: nil, isDateConfirmed: true),
-        .init(id: "EK312", flightNumber: "EK312", dateText: "Dom, 12 jul", departureAirport: "DXB", departureCity: "Dubai", departureTime: "07:40", arrivalAirport: "HND", arrivalCity: "Tóquio", arrivalTime: "22:20", duration: "9h40", aircraftNote: nil, isDateConfirmed: true),
-        .init(id: "EK317", flightNumber: "EK317", dateText: "Sáb, 25 jul", departureAirport: "KIX", departureCity: "Osaka", departureTime: "23:45", arrivalAirport: "DXB", arrivalCity: "Dubai", arrivalTime: "04:15 +1", duration: "9h30", aircraftNote: nil, isDateConfirmed: true),
-        .init(id: "EK261", flightNumber: "EK261", dateText: "Dom, 26 jul", departureAirport: "DXB", departureCity: "Dubai", departureTime: "09:05", arrivalAirport: "GRU", arrivalCity: "São Paulo", arrivalTime: "17:15", duration: "15h10", aircraftNote: "Conexão de 4h50 em Dubai.", isDateConfirmed: true)
+        .init(id: "EK262", flightNumber: "EK262", dateText: "Qua, 8 jul", departureAirport: "GRU", departureCity: "São Paulo", departureTime: "01:05", arrivalAirport: "DXB", arrivalCity: "Dubai", arrivalTime: "23:00", duration: "14h55", aircraftNote: nil, isDateConfirmed: true, seats: seats(ana: "15D", raquel: "15G", rui: "15B", beatriz: "15J", pedro: "9F")),
+        .init(id: "EK312", flightNumber: "EK312", dateText: "Dom, 12 jul", departureAirport: "DXB", departureCity: "Dubai", departureTime: "07:40", arrivalAirport: "HND", arrivalCity: "Tóquio", arrivalTime: "22:20", duration: "9h40", aircraftNote: nil, isDateConfirmed: true, seats: seats(ana: "7J", raquel: "6K", rui: "7G", beatriz: "8K", pedro: "3F")),
+        .init(id: "EK317", flightNumber: "EK317", dateText: "Sáb, 25 jul", departureAirport: "KIX", departureCity: "Osaka", departureTime: "23:45", arrivalAirport: "DXB", arrivalCity: "Dubai", arrivalTime: "04:15 +1", duration: "9h30", aircraftNote: nil, isDateConfirmed: true, seats: seats(ana: "9D", raquel: "9G", rui: "9B", beatriz: "9J", pedro: "4G")),
+        .init(id: "EK261", flightNumber: "EK261", dateText: "Dom, 26 jul", departureAirport: "DXB", departureCity: "Dubai", departureTime: "09:05", arrivalAirport: "GRU", arrivalCity: "São Paulo", arrivalTime: "17:15", duration: "15h10", aircraftNote: "Conexão de 4h50 em Dubai.", isDateConfirmed: true, seats: seats(ana: "15D", raquel: "15G", rui: "15B", beatriz: "15J", pedro: "14F"))
     ]
+
+    private static func seats(ana: String, raquel: String, rui: String, beatriz: String, pedro: String) -> [FlightSeatAssignment] {
+        [
+            .init(passengerName: "Ana Coelho", seat: ana, cabin: "Executiva"),
+            .init(passengerName: "Raquel Coelho", seat: raquel, cabin: "Executiva"),
+            .init(passengerName: "Rui Coelho", seat: rui, cabin: "Executiva"),
+            .init(passengerName: "Beatriz Mateus", seat: beatriz, cabin: "Executiva"),
+            .init(passengerName: "Pedro Mateus", seat: pedro, cabin: "Executiva")
+        ]
+    }
 }
 
 struct FlightsView: View {
@@ -133,6 +152,32 @@ private struct FlightCard: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
+
+            if !flight.seats.isEmpty {
+                Divider()
+                NavigationLink {
+                    FlightSeatsDetailView(flight: flight)
+                } label: {
+                    HStack(spacing: 12) {
+                        Image(systemName: "chair.lounge.fill")
+                            .foregroundStyle(.red)
+                            .frame(width: 34, height: 34)
+                            .background(.red.opacity(0.1), in: Circle())
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Ver assentos")
+                                .font(.subheadline.bold())
+                            Text("\(flight.seats.count) passageiros · Classe Executiva")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .font(.caption.bold())
+                            .foregroundStyle(.tertiary)
+                    }
+                }
+                .buttonStyle(.plain)
+            }
         }
         .padding()
         .background(.background, in: RoundedRectangle(cornerRadius: 22))
@@ -148,6 +193,67 @@ private struct FlightCard: View {
             Text(code).font(.title3.weight(.heavy)).foregroundStyle(.red)
             Text(city).font(.caption).foregroundStyle(.secondary)
         }
+    }
+}
+
+private struct FlightSeatsDetailView: View {
+    let flight: FlightLeg
+
+    var body: some View {
+        ScrollView {
+            VStack(spacing: 18) {
+                VStack(spacing: 8) {
+                    Image(systemName: "airplane.circle.fill")
+                        .font(.system(size: 48))
+                        .foregroundStyle(.red)
+                    Text("\(flight.departureAirport) → \(flight.arrivalAirport)")
+                        .font(.title2.bold())
+                    Text("\(flight.flightNumber) · \(flight.dateText)")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+
+                VStack(spacing: 0) {
+                    ForEach(Array(flight.seats.enumerated()), id: \.element.id) { index, assignment in
+                        HStack(spacing: 14) {
+                            VStack(spacing: 2) {
+                                Text(assignment.seat)
+                                    .font(.title3.bold().monospaced())
+                                    .foregroundStyle(.red)
+                                Text("ASSENTO")
+                                    .font(.system(size: 8, weight: .bold))
+                                    .foregroundStyle(.secondary)
+                            }
+                            .frame(width: 64, height: 58)
+                            .background(.red.opacity(0.08), in: RoundedRectangle(cornerRadius: 13))
+
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(assignment.passengerName)
+                                    .font(.headline)
+                                Label(assignment.cabin, systemImage: "chair.lounge.fill")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                        }
+                        .padding(.vertical, 13)
+                        if index < flight.seats.count - 1 { Divider() }
+                    }
+                }
+                .padding(.horizontal)
+                .background(.background, in: RoundedRectangle(cornerRadius: 22))
+
+                Text("Confirme os assentos no cartão de embarque, pois a companhia aérea pode alterá-los por motivos operacionais.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal)
+            }
+            .padding()
+        }
+        .background(Color(.systemGroupedBackground))
+        .navigationTitle("Assentos")
+        .navigationBarTitleDisplayMode(.inline)
     }
 }
 

@@ -7,16 +7,7 @@ language sql
 stable
 security definer
 set search_path = ''
-as $$
-  select (select auth.jwt() ->> 'email') = any (array[
-    'ruialmodovar@gmail.com',
-    'ana.botinas@gmail.com',
-    'raquelbotinascoelho@gmail.com',
-    'mateus80@gmail.com',
-    'luestrellado@gmail.com',
-    'biaestrellado@gmail.com'
-  ]);
-$$;
+as $$ select (select auth.uid()) is not null; $$;
 
 revoke all on function public.is_japan_trip_member() from public, anon;
 grant execute on function public.is_japan_trip_member() to authenticated;
@@ -77,11 +68,8 @@ for all to authenticated
 using ((select public.is_japan_trip_member()))
 with check (
   (select public.is_japan_trip_member())
-  and owner_email = any (array[
-    'ruialmodovar@gmail.com', 'ana.botinas@gmail.com',
-    'raquelbotinascoelho@gmail.com', 'mateus80@gmail.com',
-    'luestrellado@gmail.com', 'biaestrellado@gmail.com'
-  ])
+  and owner_user_id = (select auth.uid())
+  and owner_email = (select auth.jwt() ->> 'email')
 );
 
 drop policy if exists "trip members view photos" on public.trip_photos;

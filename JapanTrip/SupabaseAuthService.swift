@@ -24,13 +24,13 @@ struct SupabaseSession: Codable, Equatable {
 protocol SupabaseAuthenticating {
     func signIn(email: String, password: String) async throws -> SupabaseSession
     func refreshSession(refreshToken: String) async throws -> SupabaseSession
+    func updatePassword(_ newPassword: String, accessToken: String) async throws
     func signOut(accessToken: String) async
 }
 
 enum SupabaseAuthError: LocalizedError {
     case invalidConfiguration
     case invalidCredentials
-    case unauthorizedUser
     case server(String)
     case invalidResponse
 
@@ -38,7 +38,6 @@ enum SupabaseAuthError: LocalizedError {
         switch self {
         case .invalidConfiguration: "A autenticação ainda não está configurada."
         case .invalidCredentials: "E-mail ou senha incorretos."
-        case .unauthorizedUser: "Esta conta não tem acesso a esta viagem."
         case .server(let message): message
         case .invalidResponse: "O servidor devolveu uma resposta inválida."
         }
@@ -74,6 +73,21 @@ struct SupabaseAuthService: SupabaseAuthenticating {
         request.setValue(publishableKey, forHTTPHeaderField: "apikey")
         request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
         _ = try? await session.data(for: request)
+    }
+
+    func updatePassword(_ newPassword: String, accessToken: String) async throws {
+        var request = URLRequest(url: projectURL.appending(path: "auth/v1/user"))
+        request.httpMethod = "PUT"
+        request.setValue(publishableKey, forHTTPHeaderField: "apikey")
+        request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONEncoder().encode(["password": newPassword])
+        let (data, response) = try await session.data(for: request)
+        guard let http = response as? HTTPURLResponse else { throw SupabaseAuthError.invalidResponse }
+        guard 200..<300 ~= http.statusCode else {
+            let error = try? JSONDecoder().decode(SupabaseErrorResponse.self, from: data)
+            throw SupabaseAuthError.server(error?.message ?? "Não foi possível alterar a senha.")
+        }
     }
 
     private func tokenRequest(grantType: String, payload: [String: String]) async throws -> SupabaseSession {

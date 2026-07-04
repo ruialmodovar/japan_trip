@@ -133,10 +133,13 @@ final class LocationSharingManager: NSObject, ObservableObject, @preconcurrency 
     @Published private(set) var locations: [SharedParticipantLocation] = []
     @Published private(set) var authorizationStatus: CLAuthorizationStatus
     @Published private(set) var isLoading = false
+    @Published private(set) var isUploading = false
+    @Published private(set) var lastSuccessfulShareAt: Date?
     @Published var errorMessage: String?
 
     private let locationManager: CLLocationManager
     private let service: any LocationSharingServicing
+    private let defaults: UserDefaults
     private let sharingKey = "locationSharing.enabled"
     private weak var authentication: AuthenticationManager?
     private var lastUploadedLocation: CLLocation?
@@ -149,6 +152,7 @@ final class LocationSharingManager: NSObject, ObservableObject, @preconcurrency 
     ) {
         self.locationManager = locationManager
         self.service = service
+        self.defaults = defaults
         self.isSharing = defaults.bool(forKey: sharingKey)
         self.authorizationStatus = locationManager.authorizationStatus
         super.init()
@@ -161,26 +165,31 @@ final class LocationSharingManager: NSObject, ObservableObject, @preconcurrency 
         self.authentication = authentication
         errorMessage = nil
         if enabled {
-            guard authentication.authenticatedUserID != nil else {
+            guard authentication.isAuthenticated, authentication.authenticatedUserID != nil else {
                 errorMessage = "Sessão inválida. Entre novamente."
                 return
             }
+            guard CLLocationManager.locationServicesEnabled() else {
+                errorMessage = "Ative os Serviços de Localização nas Definições do iPhone."
+                return
+            }
             isSharing = true
-            UserDefaults.standard.set(true, forKey: sharingKey)
+            defaults.set(true, forKey: sharingKey)
             switch locationManager.authorizationStatus {
             case .notDetermined:
                 locationManager.requestWhenInUseAuthorization()
             case .authorizedWhenInUse, .authorizedAlways:
                 locationManager.startUpdatingLocation()
+                locationManager.requestLocation()
             case .denied, .restricted:
                 isSharing = false
-                UserDefaults.standard.set(false, forKey: sharingKey)
+                defaults.set(false, forKey: sharingKey)
                 errorMessage = "Permita o acesso à localização nas Definições do iPhone."
             @unknown default: break
             }
         } else {
             isSharing = false
-            UserDefaults.standard.set(false, forKey: sharingKey)
+            defaults.set(false, forKey: sharingKey)
             locationManager.stopUpdatingLocation()
             await removeOwnLocation(authentication: authentication)
         }
@@ -188,13 +197,38 @@ final class LocationSharingManager: NSObject, ObservableObject, @preconcurrency 
 
     func resumeIfNeeded(authentication: AuthenticationManager) {
         self.authentication = authentication
-        if isSharing, [.authorizedWhenInUse, .authorizedAlways].contains(locationManager.authorizationStatus) {
+        guard isSharing else { return }
+        switch locationManager.authorizationStatus {
+        case .notDetermined:
+            locationManager.requestWhenInUseAuthorization()
+        case .authorizedWhenInUse, .authorizedAlways:
             locationManager.startUpdatingLocation()
+            locationManager.requestLocation()
+        case .denied, .restricted:
+            isSharing = false
+            defaults.set(false, forKey: sharingKey)
+            errorMessage = "Permita o acesso à localização nas Definições do iPhone."
+        @unknown default:
+            break
         }
     }
 
     func pauseUpdates() {
         locationManager.stopUpdatingLocation()
+    }
+
+    func requestImmediateUpdate(authentication: AuthenticationManager) {
+        self.authentication = authentication
+        guard isSharing else {
+            errorMessage = "Ative primeiro a partilha da sua localização."
+            return
+        }
+        guard [.authorizedWhenInUse, .authorizedAlways].contains(locationManager.authorizationStatus) else {
+            errorMessage = "Permita o acesso à localização nas Definições do iPhone."
+            return
+        }
+        lastUploadDate = nil
+        locationManager.requestLocation()
     }
 
     func refresh(authentication: AuthenticationManager) async {
@@ -205,11 +239,10 @@ final class LocationSharingManager: NSObject, ObservableObject, @preconcurrency 
             let token = try await authentication.accessTokenForAPI()
             locations = try await service.fetchLocations(accessToken: token)
                 .filter {
-                    TripParticipant.participant(for: $0.email) != nil
-                    && ($0.updatedDate.map { Date().timeIntervalSince($0) < 21_600 } ?? false)
+                    $0.updatedDate.map { Date().timeIntervalSince($0) < 21_600 } ?? false
                 }
         } catch {
-            errorMessage = "Não foi possível atualizar as localizações."
+            errorMessage = "Não foi possível atualizar as localizações: \(error.localizedDescription)"
         }
     }
 
@@ -217,9 +250,11 @@ final class LocationSharingManager: NSObject, ObservableObject, @preconcurrency 
         authorizationStatus = manager.authorizationStatus
         if isSharing, [.authorizedWhenInUse, .authorizedAlways].contains(manager.authorizationStatus) {
             manager.startUpdatingLocation()
+            manager.requestLocation()
         } else if manager.authorizationStatus == .denied || manager.authorizationStatus == .restricted {
             isSharing = false
-            UserDefaults.standard.set(false, forKey: sharingKey)
+            defaults.set(false, forKey: sharingKey)
+            errorMessage = "O acesso à localização foi recusado. Abra as Definições para permitir."
         }
     }
 
@@ -227,9 +262,7 @@ final class LocationSharingManager: NSObject, ObservableObject, @preconcurrency 
         guard isSharing, let location = newLocations.last, location.horizontalAccuracy >= 0 else { return }
         let recentlyUploaded = lastUploadDate.map { Date().timeIntervalSince($0) < 45 } ?? false
         let barelyMoved = lastUploadedLocation.map { location.distance(from: $0) < 50 } ?? false
-        guard !(recentlyUploaded && barelyMoved), let authentication else { return }
-        lastUploadDate = Date()
-        lastUploadedLocation = location
+        guard !(recentlyUploaded && barelyMoved), !isUploading, let authentication else { return }
         Task { await upload(location, authentication: authentication) }
     }
 
@@ -241,12 +274,18 @@ final class LocationSharingManager: NSObject, ObservableObject, @preconcurrency 
     private func upload(_ location: CLLocation, authentication: AuthenticationManager) async {
         guard let userID = authentication.authenticatedUserID,
               let email = authentication.authenticatedEmail else { return }
+        isUploading = true
+        defer { isUploading = false }
         do {
             let token = try await authentication.accessTokenForAPI()
             try await service.upsertLocation(userID: userID, email: email, location: location, accessToken: token)
+            lastUploadDate = Date()
+            lastUploadedLocation = location
+            lastSuccessfulShareAt = Date()
+            errorMessage = nil
             await refresh(authentication: authentication)
         } catch {
-            errorMessage = "Não foi possível partilhar a localização."
+            errorMessage = "Não foi possível partilhar a localização: \(error.localizedDescription)"
         }
     }
 
@@ -316,6 +355,27 @@ struct LocationSharingView: View {
                  ? "A posição aproximada é atualizada enquanto o app está aberto."
                  : "Ninguém recebe a tua posição. Ao desligar, o último ponto é removido do Supabase.")
                 .font(.subheadline).foregroundStyle(.secondary)
+            if sharing.isSharing {
+                HStack {
+                    if sharing.isUploading {
+                        ProgressView()
+                        Text("A enviar localização…")
+                    } else if let date = sharing.lastSuccessfulShareAt {
+                        Label("Enviada \(date.formatted(.relative(presentation: .named)))", systemImage: "checkmark.circle.fill")
+                            .foregroundStyle(.green)
+                    } else {
+                        Label("Ainda não enviada", systemImage: "clock.fill")
+                            .foregroundStyle(.orange)
+                    }
+                    Spacer()
+                    Button("Enviar agora") {
+                        sharing.requestImmediateUpdate(authentication: authentication)
+                    }
+                    .buttonStyle(.bordered)
+                    .disabled(sharing.isUploading)
+                }
+                .font(.caption)
+            }
             if sharing.authorizationStatus == .denied {
                 Button("Abrir Definições") { openURL(URL(string: UIApplication.openSettingsURLString)!) }
                     .buttonStyle(.bordered)

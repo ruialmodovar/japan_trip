@@ -18,7 +18,17 @@ struct TripParticipant: Identifiable, Hashable {
     ]
 
     static func participant(for email: String) -> TripParticipant? {
-        all.first { $0.email == email.lowercased() }
+        let canonical = normalizedEmail(email)
+        return all.first { normalizedEmail($0.email) == canonical }
+    }
+
+    static func normalizedEmail(_ email: String) -> String {
+        email
+            .components(separatedBy: .whitespacesAndNewlines).joined()
+            .components(separatedBy: .controlCharacters).joined()
+            .replacingOccurrences(of: "\u{200B}", with: "")
+            .replacingOccurrences(of: "\u{FEFF}", with: "")
+            .lowercased()
     }
 }
 
@@ -114,6 +124,16 @@ struct Reservation: Identifiable, Codable, Hashable {
 }
 
 struct ChecklistItem: Identifiable, Codable, Hashable {
+    enum Scope: String, CaseIterable, Codable, Identifiable {
+        case general
+        case personal
+
+        var id: String { rawValue }
+        var title: String { self == .general ? "Geral" : "Pessoal" }
+        var subtitle: String { self == .general ? "Partilhada com todo o grupo" : "Visível apenas para ti" }
+        var symbol: String { self == .general ? "person.3.fill" : "person.fill" }
+    }
+
     enum Section: String, CaseIterable, Codable {
         case urgent = "Fazer agora"
         case before = "Antes da viagem"
@@ -124,6 +144,24 @@ struct ChecklistItem: Identifiable, Codable, Hashable {
     let id: String
     let title: String
     let section: Section
+    let scope: Scope
+
+    init(id: String, title: String, section: Section, scope: Scope = .general) {
+        self.id = id
+        self.title = title
+        self.section = section
+        self.scope = scope
+    }
+
+    enum CodingKeys: String, CodingKey { case id, title, section, scope }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(String.self, forKey: .id)
+        title = try container.decode(String.self, forKey: .title)
+        section = try container.decode(Section.self, forKey: .section)
+        scope = try container.decodeIfPresent(Scope.self, forKey: .scope) ?? .general
+    }
 }
 
 enum TripDate {

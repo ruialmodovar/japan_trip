@@ -30,6 +30,7 @@ final class TripDataTests: XCTestCase {
 
     func testChecklistIDsAreUnique() {
         XCTAssertEqual(Set(TripData.checklist.map(\.id)).count, TripData.checklist.count)
+        XCTAssertTrue(TripData.checklist.allSatisfy { $0.scope == .general })
     }
 
     func testReservationIDsAreUnique() {
@@ -37,9 +38,131 @@ final class TripDataTests: XCTestCase {
     }
 }
 
+final class OutfitRecommendationTests: XCTestCase {
+    func testEveryActivityHasRecommendationsForBoysGirlsAndSharedItems() {
+        for day in TripData.days {
+            for activity in day.activities {
+                let recommendation = OutfitRecommendation.forActivity(activity, city: day.city)
+                XCTAssertFalse(recommendation.boys.isEmpty, activity.title)
+                XCTAssertFalse(recommendation.girls.isEmpty, activity.title)
+                XCTAssertFalse(recommendation.shared.isEmpty, activity.title)
+            }
+        }
+    }
+
+    func testSpecialActivitiesReceiveSpecificClothingAdvice() throws {
+        let activities = TripData.days.flatMap(\.activities)
+        let safari = try XCTUnwrap(activities.first { $0.title.contains("Desert Safari") })
+        let teamLab = try XCTUnwrap(activities.first { $0.title == "teamLab" })
+        let flight = try XCTUnwrap(activities.first { $0.kind == .flight })
+
+        let safariAdvice = OutfitRecommendation.forActivity(safari, city: .dubai)
+        XCTAssertTrue(safariAdvice.shared.contains { $0.localizedCaseInsensitiveContains("areia") })
+        XCTAssertTrue(safariAdvice.climateSummary.contains("41°"))
+
+        let teamLabAdvice = OutfitRecommendation.forActivity(teamLab, city: .travel)
+        XCTAssertTrue(teamLabAdvice.girls.contains { $0.localizedCaseInsensitiveContains("evitar saia") })
+        XCTAssertTrue(teamLabAdvice.shared.contains { $0.localizedCaseInsensitiveContains("meias extra") })
+
+        let flightAdvice = OutfitRecommendation.forActivity(flight, city: .travel)
+        XCTAssertTrue(flightAdvice.boys.contains { $0.localizedCaseInsensitiveContains("casaco") })
+    }
+}
+
+final class NowModePlannerTests: XCTestCase {
+    func testModeNowMovesFromCountdownToCurrentAndCompleted() throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "America/Sao_Paulo")!
+        let entries = NowModePlanner.scheduledEntries(calendar: calendar)
+        let first = try XCTUnwrap(entries.first)
+        let last = try XCTUnwrap(entries.last)
+
+        let before = NowModePlanner.moment(at: first.date.addingTimeInterval(-3_600), calendar: calendar)
+        XCTAssertEqual(before.phase, .beforeTrip)
+        XCTAssertEqual(before.entry?.activity.id, first.activity.id)
+
+        let happening = NowModePlanner.moment(at: first.date.addingTimeInterval(30 * 60), calendar: calendar)
+        XCTAssertEqual(happening.phase, .happening)
+
+        let completed = NowModePlanner.moment(at: last.date.addingTimeInterval(5 * 60 * 60), calendar: calendar)
+        XCTAssertEqual(completed.phase, .completed)
+    }
+
+    func testAfterMidnightActivitiesRemainChronological() {
+        let entries = NowModePlanner.scheduledEntries()
+        XCTAssertEqual(entries, entries.sorted { $0.date < $1.date })
+        XCTAssertEqual(Set(entries.map(\.activity.id)).count, TripData.days.flatMap(\.activities).count)
+    }
+}
+
+@MainActor
+final class ActivityRatingTests: XCTestCase {
+    func testRatingSummaryAndRankingUseAllParticipants() throws {
+        let suiteName = UUID().uuidString
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let activity = TripData.days[0].activities[0]
+        let ratings = [
+            ActivityRating(activityID: activity.id, userID: UUID(), email: "ruialmodovar@gmail.com", stars: 5, updatedAt: nil),
+            ActivityRating(activityID: activity.id, userID: UUID(), email: "ana.botinas@gmail.com", stars: 3, updatedAt: nil)
+        ]
+        defaults.set(try JSONEncoder().encode(ratings), forKey: "activityRatings.cache")
+
+        let store = ActivityRatingStore(service: OfflineActivityRatingService(), defaults: defaults)
+        let summary = try XCTUnwrap(store.summary(for: activity.id))
+        XCTAssertEqual(summary.average, 4, accuracy: 0.001)
+        XCTAssertEqual(summary.count, 2)
+        XCTAssertEqual(store.ranking.first?.activity.id, activity.id)
+    }
+
+    func testRatingPayloadUsesSupabaseColumnNames() throws {
+        let rating = ActivityRating(activityID: "activity-1", userID: UUID(), email: "user@example.com", stars: 5, updatedAt: nil)
+        let object = try JSONSerialization.jsonObject(with: JSONEncoder().encode(rating)) as! [String: Any]
+        XCTAssertEqual(object["activity_id"] as? String, "activity-1")
+        XCTAssertNotNil(object["user_id"])
+    }
+}
+
+@MainActor
+final class ChecklistScopeTests: XCTestCase {
+    func testLegacyChecklistItemMigratesToGeneralScope() throws {
+        let data = Data(#"{"id":"legacy","title":"Item antigo","section":"Antes da viagem"}"#.utf8)
+        let item = try JSONDecoder().decode(ChecklistItem.self, from: data)
+        XCTAssertEqual(item.scope, .general)
+    }
+
+    func testPersonalChecklistIsIsolatedByAuthenticatedEmail() async {
+        let suiteName = UUID().uuidString
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defer { defaults.removePersistentDomain(forName: suiteName) }
+        let state = TripState(defaults: defaults, checklistService: OfflineChecklistService())
+        let rui = AuthenticationManager(authService: MockSupabaseAuthService(), sessionStore: InMemorySessionStore())
+        let ana = AuthenticationManager(authService: MockSupabaseAuthService(), sessionStore: InMemorySessionStore())
+        let ruiSignedIn = await rui.authenticate(email: "ruialmodovar@gmail.com", password: "valid-test-password")
+        let anaSignedIn = await ana.authenticate(email: "ana.botinas@gmail.com", password: "valid-test-password")
+        XCTAssertTrue(ruiSignedIn)
+        XCTAssertTrue(anaSignedIn)
+
+        state.configureChecklistSharing(authentication: rui)
+        state.addChecklistItem(title: "Comprar presente", section: .during, scope: .personal)
+        XCTAssertEqual(state.items(in: .personal).map(\.title), ["Comprar presente"])
+
+        state.configureChecklistSharing(authentication: ana)
+        XCTAssertTrue(state.items(in: .personal).isEmpty)
+
+        state.configureChecklistSharing(authentication: rui)
+        XCTAssertEqual(state.items(in: .personal).map(\.title), ["Comprar presente"])
+    }
+}
+
 final class FlightTests: XCTestCase {
     func testAllExpectedEmiratesLegsExist() {
         XCTAssertEqual(FlightLeg.trip.map(\.flightNumber), ["EK262", "EK312", "EK317", "EK261"])
+        XCTAssertTrue(FlightLeg.trip.allSatisfy { $0.seats.count == 5 })
+        XCTAssertEqual(FlightLeg.trip[0].seats.first { $0.passengerName == "Rui Coelho" }?.seat, "15B")
+        XCTAssertEqual(FlightLeg.trip[1].seats.first { $0.passengerName == "Pedro Mateus" }?.seat, "3F")
+        XCTAssertEqual(FlightLeg.trip[2].seats.first { $0.passengerName == "Beatriz Mateus" }?.seat, "9J")
+        XCTAssertEqual(FlightLeg.trip[3].seats.first { $0.passengerName == "Ana Coelho" }?.seat, "15D")
         XCTAssertEqual(FlightLeg.trip.first?.departureAirport, "GRU")
         XCTAssertEqual(FlightLeg.trip.last?.arrivalAirport, "GRU")
     }
@@ -125,7 +248,7 @@ final class AuthenticationAndNavigationTests: XCTestCase {
         let wrongPasswordResult = await authentication.authenticate(email: "ruialmodovar@gmail.com", password: "wrong-password")
         XCTAssertFalse(wrongPasswordResult)
         XCTAssertFalse(authentication.isAuthenticated)
-        let validResult = await authentication.authenticate(email: " RUIALMODOVAR@GMAIL.COM ", password: "valid-test-password")
+        let validResult = await authentication.authenticate(email: " RUIALMODOVAR@GMAIL.COM\u{200B} ", password: "valid-test-password")
         XCTAssertTrue(validResult)
         XCTAssertTrue(authentication.isAuthenticated)
         XCTAssertEqual(authentication.authenticatedEmail, "ruialmodovar@gmail.com")
@@ -133,7 +256,34 @@ final class AuthenticationAndNavigationTests: XCTestCase {
         authentication.signOut()
     }
 
-    func testOnlyAuthorizedSupabaseUsersUnlock() async {
+    func testPasswordChangeRequiresCurrentPasswordAndMatchingConfirmation() async {
+        let authentication = makeAuthentication()
+        let signedIn = await authentication.authenticate(email: "ruialmodovar@gmail.com", password: "valid-test-password")
+        XCTAssertTrue(signedIn)
+
+        let mismatch = await authentication.changePassword(
+            currentPassword: "valid-test-password",
+            newPassword: "nova-senha",
+            confirmation: "outra-senha"
+        )
+        XCTAssertFalse(mismatch)
+
+        let wrongCurrent = await authentication.changePassword(
+            currentPassword: "senha-errada",
+            newPassword: "nova-senha",
+            confirmation: "nova-senha"
+        )
+        XCTAssertFalse(wrongCurrent)
+
+        let changed = await authentication.changePassword(
+            currentPassword: "valid-test-password",
+            newPassword: "nova-senha",
+            confirmation: "nova-senha"
+        )
+        XCTAssertTrue(changed)
+    }
+
+    func testAnySupabaseAuthenticatedUserUnlocks() async {
         let authentication = makeAuthentication()
         let authorized = [
             ("ruialmodovar@gmail.com", "Rui Coelho"),
@@ -152,7 +302,9 @@ final class AuthenticationAndNavigationTests: XCTestCase {
             XCTAssertNil(authentication.authenticatedName)
         }
         let unauthorizedResult = await authentication.authenticate(email: "intruso@example.com", password: "valid-test-password")
-        XCTAssertFalse(unauthorizedResult)
+        XCTAssertTrue(unauthorizedResult)
+        XCTAssertEqual(authentication.authenticatedEmail, "intruso@example.com")
+        XCTAssertEqual(authentication.authenticatedName, "intruso")
     }
 
     func testTrustedSessionAvoidsBiometricsForTwelveHours() async {
@@ -201,6 +353,8 @@ final class AuthenticationAndNavigationTests: XCTestCase {
         navigation.showsLocationSharing = true
         navigation.showsExpenses = true
         navigation.showsShopping = true
+        navigation.showsPersonalDiary = true
+        navigation.showsChangePassword = true
         navigation.showsMobility = true
         let previousRequest = navigation.homeRequestID
 
@@ -215,6 +369,8 @@ final class AuthenticationAndNavigationTests: XCTestCase {
         XCTAssertFalse(navigation.showsLocationSharing)
         XCTAssertFalse(navigation.showsExpenses)
         XCTAssertFalse(navigation.showsShopping)
+        XCTAssertFalse(navigation.showsPersonalDiary)
+        XCTAssertFalse(navigation.showsChangePassword)
         XCTAssertFalse(navigation.showsMobility)
         XCTAssertEqual(navigation.homeRequestID, previousRequest + 1)
     }
@@ -224,6 +380,34 @@ final class AuthenticationAndNavigationTests: XCTestCase {
             authService: MockSupabaseAuthService(),
             sessionStore: InMemorySessionStore()
         )
+    }
+}
+
+final class PersonalDiaryTests: XCTestCase {
+    func testAutomaticPageUsesTheDayActivities() {
+        let day = TripData.days[1]
+        let summary = PersonalDiaryStore.automaticSummary(for: day)
+
+        XCTAssertTrue(summary.contains(day.activities[0].title))
+        XCTAssertTrue(summary.contains(day.activities.last!.title))
+    }
+
+    func testEntryPayloadUsesPrivateDiaryColumnNames() throws {
+        let entry = PersonalDiaryEntry(
+            dayID: "2026-07-16",
+            userID: UUID(),
+            email: "rui@example.com",
+            note: "Um dia inesquecível.",
+            mood: 5,
+            highlight: "Fantasy Springs",
+            createdAt: nil,
+            updatedAt: nil
+        )
+        let object = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder().encode(entry)) as? [String: Any])
+
+        XCTAssertEqual(object["day_id"] as? String, "2026-07-16")
+        XCTAssertNotNil(object["user_id"])
+        XCTAssertNil(object["dayID"])
     }
 }
 
@@ -436,6 +620,8 @@ private struct MockSupabaseAuthService: SupabaseAuthenticating {
         makeSession(email: "ruialmodovar@gmail.com")
     }
 
+    func updatePassword(_ newPassword: String, accessToken: String) async throws {}
+
     func signOut(accessToken: String) async {}
 
     private func makeSession(email: String) -> SupabaseSession {
@@ -446,6 +632,19 @@ private struct MockSupabaseAuthService: SupabaseAuthenticating {
             expiresAt: Int(Date().addingTimeInterval(3_600).timeIntervalSince1970),
             user: .init(id: UUID(uuidString: "00000000-0000-0000-0000-000000000001")!, email: email)
         )
+    }
+}
+
+private struct OfflineChecklistService: ChecklistSharingServicing {
+    func fetch(accessToken: String) async throws -> [ChecklistCloudRecord] { throw URLError(.notConnectedToInternet) }
+    func upsert(_ record: ChecklistCloudRecord, accessToken: String) async throws { throw URLError(.notConnectedToInternet) }
+    func delete(id: String, accessToken: String) async throws { throw URLError(.notConnectedToInternet) }
+}
+
+private struct OfflineActivityRatingService: ActivityRatingServicing {
+    func fetch(accessToken: String) async throws -> [ActivityRating] { throw URLError(.notConnectedToInternet) }
+    func upsert(activityID: String, userID: UUID, email: String, stars: Int, accessToken: String) async throws {
+        throw URLError(.notConnectedToInternet)
     }
 }
 

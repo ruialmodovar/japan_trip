@@ -165,6 +165,7 @@ struct ShoppingView: View {
     @State private var selectedPhoto: PhotosPickerItem?
     @State private var capturedImage: UIImage?
     @State private var editingItem: ShoppingItem?
+    @State private var didOpenCaptureAutomatically = false
 
     var body: some View {
         ScrollView {
@@ -203,6 +204,17 @@ struct ShoppingView: View {
         }
         .sheet(item: $editingItem) { item in ShoppingItemDetail(item: item) }
         .task { await expenses.refreshRates() }
+        .onAppear {
+            guard !didOpenCaptureAutomatically else { return }
+            didOpenCaptureAutomatically = true
+            DispatchQueue.main.async {
+                if UIImagePickerController.isSourceTypeAvailable(.camera) {
+                    showsCamera = true
+                } else {
+                    showsPhotos = true
+                }
+            }
+        }
         .onDisappear {
             authentication.suppressAutoLock("shopping-camera", while: false)
             authentication.suppressAutoLock("shopping-photos", while: false)
@@ -212,7 +224,7 @@ struct ShoppingView: View {
     private var hero: some View {
         VStack(alignment: .leading, spacing: 15) {
             Label("Conversor visual de preços", systemImage: "camera.viewfinder").font(.title2.bold())
-            Text("Fotografe o produto e a etiqueta. Todos os valores reconhecidos são tratados como ienes e convertidos automaticamente.")
+            Text("Fotografe o produto e a etiqueta. O valor é tratado como iene, convertido primeiro para real e depois para as outras moedas.")
                 .font(.subheadline).foregroundStyle(.secondary)
             HStack(spacing: 10) {
                 Button { showsCamera = true } label: { Label("Fotografar preço", systemImage: "camera.fill").frame(maxWidth: .infinity) }
@@ -233,8 +245,11 @@ struct ShoppingView: View {
                 }
                 VStack(alignment: .leading, spacing: 6) {
                     HStack { Text(item.name).font(.headline); if item.isPurchased { Image(systemName: "checkmark.circle.fill").foregroundStyle(.green) } }
-                    Text(originalPrice(item)).font(.title3.bold()).foregroundStyle(.pink)
-                    Text("\(converted(item, to: .BRL)) · \(converted(item, to: .EUR)) · \(converted(item, to: .USD))")
+                    Text(amountInBRL(item).formatted(.currency(code: "BRL").locale(Locale(identifier: "pt_BR"))))
+                        .font(.title3.bold()).foregroundStyle(.pink)
+                    Text("Original: \(originalPrice(item))")
+                        .font(.caption).foregroundStyle(.secondary)
+                    Text("\(convertedFromBRL(item, to: .EUR)) · \(convertedFromBRL(item, to: .USD))")
                         .font(.caption).foregroundStyle(.secondary).lineLimit(2)
                     if !item.storeName.isEmpty { Label(item.storeName, systemImage: "storefront.fill").font(.caption).foregroundStyle(.secondary) }
                 }
@@ -249,11 +264,18 @@ struct ShoppingView: View {
 
     private func adjustedAmount(_ item: ShoppingItem) -> Double { item.taxFreeEnabled ? item.amount / 1.10 : item.amount }
     private func originalPrice(_ item: ShoppingItem) -> String { adjustedAmount(item).formatted(.currency(code: item.currency.rawValue)) + (item.taxFreeEnabled ? " tax-free*" : "") }
-    private func converted(_ item: ShoppingItem, to currency: TripCurrency) -> String { expenses.converted(adjustedAmount(item), from: item.currency, to: currency).formatted(.currency(code: currency.rawValue)) }
+    private func amountInBRL(_ item: ShoppingItem) -> Double {
+        expenses.converted(adjustedAmount(item), from: .JPY, to: .BRL)
+    }
+    private func convertedFromBRL(_ item: ShoppingItem, to currency: TripCurrency) -> String {
+        expenses.converted(amountInBRL(item), from: .BRL, to: currency)
+            .formatted(.currency(code: currency.rawValue))
+    }
 }
 
 private struct ShoppingScanEditor: View {
     @EnvironmentObject private var shopping: ShoppingStore
+    @EnvironmentObject private var expenses: ExpenseStore
     @Environment(\.dismiss) private var dismiss
     let image: UIImage
     @State private var name = ""
@@ -274,8 +296,20 @@ private struct ShoppingScanEditor: View {
                         }
                     }
                     TextField("Valor em ienes", value: $amount, format: .number.precision(.fractionLength(0...2))).keyboardType(.decimalPad)
-                    Label("O valor será sempre guardado em JPY", systemImage: "yensign.circle.fill")
+                    Label("A fotografia é interpretada em JPY e convertida primeiro para BRL", systemImage: "arrow.triangle.2.circlepath")
                         .font(.caption).foregroundStyle(.secondary)
+                    if amount > 0 {
+                        let inBRL = expenses.converted(adjustedYen, from: .JPY, to: .BRL)
+                        VStack(alignment: .leading, spacing: 7) {
+                            Text("PRIMEIRO EM REAIS")
+                                .font(.caption2.bold()).tracking(0.8).foregroundStyle(.secondary)
+                            Text(inBRL.formatted(.currency(code: "BRL").locale(Locale(identifier: "pt_BR"))))
+                                .font(.title2.bold()).foregroundStyle(.green)
+                            Text("Depois: \(expenses.converted(inBRL, from: .BRL, to: .EUR).formatted(.currency(code: "EUR"))) · \(expenses.converted(inBRL, from: .BRL, to: .USD).formatted(.currency(code: "USD")))")
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
+                        .padding(.vertical, 4)
+                    }
                 }
                 Section("Produto") {
                     TextField("Nome do produto", text: $name)
@@ -301,6 +335,8 @@ private struct ShoppingScanEditor: View {
             }
         }
     }
+
+    private var adjustedYen: Double { taxFree ? amount / 1.10 : amount }
 }
 
 private struct ShoppingItemDetail: View {
@@ -311,6 +347,7 @@ private struct ShoppingItemDetail: View {
     let item: ShoppingItem
 
     var adjustedAmount: Double { item.taxFreeEnabled ? item.amount / 1.10 : item.amount }
+    var amountInBRL: Double { expenses.converted(adjustedAmount, from: .JPY, to: .BRL) }
 
     var body: some View {
         NavigationStack {
@@ -318,14 +355,14 @@ private struct ShoppingItemDetail: View {
                 VStack(spacing: 18) {
                     if let image = UIImage(contentsOfFile: shopping.imageURL(for: item).path) { Image(uiImage: image).resizable().scaledToFit() }
                     Text(item.name).font(.title2.bold())
-                    conversion("Preço original", adjustedAmount, item.currency)
-                    conversion("Em reais", expenses.converted(adjustedAmount, from: item.currency, to: .BRL), .BRL)
-                    conversion("Em euros", expenses.converted(adjustedAmount, from: item.currency, to: .EUR), .EUR)
-                    conversion("Em dólares", expenses.converted(adjustedAmount, from: item.currency, to: .USD), .USD)
+                    conversion("Preço original", adjustedAmount, .JPY)
+                    conversion("Primeiro em reais", amountInBRL, .BRL)
+                    conversion("Depois em euros", expenses.converted(amountInBRL, from: .BRL, to: .EUR), .EUR)
+                    conversion("Depois em dólares", expenses.converted(amountInBRL, from: .BRL, to: .USD), .USD)
                     if !item.isPurchased {
                         Button {
                             let email = authentication.authenticatedEmail ?? TripParticipant.all[0].email
-                            expenses.add(.init(id: UUID(), title: item.name, amount: adjustedAmount, currency: item.currency, date: Date(), category: .shopping, payerEmail: email, participantEmails: [email], note: "Adicionado pelo menu Compras"))
+                            expenses.add(.init(id: UUID(), title: item.name, amount: amountInBRL, currency: .BRL, date: Date(), category: .shopping, payerEmail: email, participantEmails: [email], note: "Preço original: \(adjustedAmount.formatted(.currency(code: "JPY"))). Convertido primeiro para BRL pelo menu Compras."))
                             shopping.markPurchased(item)
                             dismiss()
                         } label: { Label("Comprei · adicionar às Despesas", systemImage: "cart.badge.plus").frame(maxWidth: .infinity) }

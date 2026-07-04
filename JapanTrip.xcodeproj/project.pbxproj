@@ -33,6 +33,12 @@
 		A10000000000000000000025 /* ExpensesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000025 /* ExpensesView.swift */; };
 		A10000000000000000000026 /* ShoppingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000026 /* ShoppingView.swift */; };
 		A10000000000000000000027 /* TripSharingService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000027 /* TripSharingService.swift */; };
+		A10000000000000000000028 /* ActivityRatings.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000028 /* ActivityRatings.swift */; };
+		A10000000000000000000029 /* OutfitRecommendations.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000029 /* OutfitRecommendations.swift */; };
+		A10000000000000000000030 /* NowMode.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000030 /* NowMode.swift */; };
+		A10000000000000000000031 /* PersonalDiary.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000031 /* PersonalDiary.swift */; };
+		A10000000000000000000032 /* FeatureHubView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000032 /* FeatureHubView.swift */; };
+		A10000000000000000000033 /* DiaryVoiceAssistant.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000033 /* DiaryVoiceAssistant.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -74,6 +80,12 @@
 		B10000000000000000000025 /* ExpensesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExpensesView.swift; sourceTree = "<group>"; };
 		B10000000000000000000026 /* ShoppingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShoppingView.swift; sourceTree = "<group>"; };
 		B10000000000000000000027 /* TripSharingService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TripSharingService.swift; sourceTree = "<group>"; };
+		B10000000000000000000028 /* ActivityRatings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ActivityRatings.swift; sourceTree = "<group>"; };
+		B10000000000000000000029 /* OutfitRecommendations.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OutfitRecommendations.swift; sourceTree = "<group>"; };
+		B10000000000000000000030 /* NowMode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NowMode.swift; sourceTree = "<group>"; };
+		B10000000000000000000031 /* PersonalDiary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PersonalDiary.swift; sourceTree = "<group>"; };
+		B10000000000000000000032 /* FeatureHubView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeatureHubView.swift; sourceTree = "<group>"; };
+		B10000000000000000000033 /* DiaryVoiceAssistant.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiaryVoiceAssistant.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -131,6 +143,12 @@
 				B10000000000000000000025 /* ExpensesView.swift */,
 				B10000000000000000000026 /* ShoppingView.swift */,
 				B10000000000000000000027 /* TripSharingService.swift */,
+				B10000000000000000000028 /* ActivityRatings.swift */,
+				B10000000000000000000029 /* OutfitRecommendations.swift */,
+				B10000000000000000000030 /* NowMode.swift */,
+				B10000000000000000000031 /* PersonalDiary.swift */,
+				B10000000000000000000032 /* FeatureHubView.swift */,
+				B10000000000000000000033 /* DiaryVoiceAssistant.swift */,
 			);
 			path = JapanTrip;
 			sourceTree = "<group>";
@@ -275,6 +293,12 @@
 				A10000000000000000000025 /* ExpensesView.swift in Sources */,
 				A10000000000000000000026 /* ShoppingView.swift in Sources */,
 				A10000000000000000000027 /* TripSharingService.swift in Sources */,
+				A10000000000000000000028 /* ActivityRatings.swift in Sources */,
+				A10000000000000000000029 /* OutfitRecommendations.swift in Sources */,
+				A10000000000000000000030 /* NowMode.swift in Sources */,
+				A10000000000000000000031 /* PersonalDiary.swift in Sources */,
+				A10000000000000000000032 /* FeatureHubView.swift in Sources */,
+				A10000000000000000000033 /* DiaryVoiceAssistant.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -351,11 +375,14 @@
 				INFOPLIST_KEY_NSCameraUsageDescription = "Use a câmera para registrar e guardar memórias da viagem no diário privado.";
 				INFOPLIST_KEY_NSFaceIDUsageDescription = "Use o Face ID para proteger o roteiro e as reservas da viagem.";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Partilhe a sua localização aproximada com os participantes da viagem enquanto utiliza o app.";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Use o microfone para ditar memórias no seu diário pessoal.";
+				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "Converta a sua voz em texto para criar entradas no diário pessoal.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = UIInterfaceOrientationPortrait;
-				MARKETING_VERSION = 1.4;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				MARKETING_VERSION = 1.6;
 				PRODUCT_BUNDLE_IDENTIFIER = com.ruicoelho;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
@@ -379,11 +406,14 @@
 				INFOPLIST_KEY_NSCameraUsageDescription = "Use a câmera para registrar e guardar memórias da viagem no diário privado.";
 				INFOPLIST_KEY_NSFaceIDUsageDescription = "Use o Face ID para proteger o roteiro e as reservas da viagem.";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Partilhe a sua localização aproximada com os participantes da viagem enquanto utiliza o app.";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Use o microfone para ditar memórias no seu diário pessoal.";
+				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "Converta a sua voz em texto para criar entradas no diário pessoal.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = UIInterfaceOrientationPortrait;
-				MARKETING_VERSION = 1.4;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				MARKETING_VERSION = 1.6;
 				PRODUCT_BUNDLE_IDENTIFIER = com.ruicoelho;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";

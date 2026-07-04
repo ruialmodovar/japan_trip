@@ -33,14 +33,7 @@ create policy "trip participants can view shared locations"
 on public.trip_locations for select
 to authenticated
 using (
-  (select auth.jwt() ->> 'email') = any (array[
-    'ruialmodovar@gmail.com',
-    'ana.botinas@gmail.com',
-    'raquelbotinascoelho@gmail.com',
-    'mateus80@gmail.com',
-    'luestrellado@gmail.com',
-    'biaestrellado@gmail.com'
-  ])
+  (select auth.uid()) is not null
   and updated_at > now() - interval '6 hours'
 );
 
@@ -51,11 +44,6 @@ to authenticated
 with check (
   (select auth.uid()) = user_id
   and email = (select auth.jwt() ->> 'email')
-  and email = any (array[
-    'ruialmodovar@gmail.com', 'ana.botinas@gmail.com',
-    'raquelbotinascoelho@gmail.com', 'mateus80@gmail.com',
-    'luestrellado@gmail.com', 'biaestrellado@gmail.com'
-  ])
 );
 
 drop policy if exists "participants can update own location" on public.trip_locations;

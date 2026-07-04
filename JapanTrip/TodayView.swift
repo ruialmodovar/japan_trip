@@ -18,9 +18,11 @@ struct TodayView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 18) {
+                TripCountdownCard()
                 if let name = authentication.authenticatedName {
                     WelcomeCard(name: name)
                 }
+                NowModeCard()
                 if let today {
                     TripHeader(city: today.city, eyebrow: today.date.formatted(.dateTime.weekday(.wide).day().month(.wide).locale(Locale(identifier: "pt_BR"))), title: today.title, subtitle: "\(today.activities.count) momentos no roteiro")
 
@@ -52,7 +54,6 @@ struct TodayView: View {
                 } else {
                     TripHeader(city: .travel, eyebrow: "Dubai · Japão", title: countdown > 0 ? "Faltam \(countdown) dias" : "Viagem 2026", subtitle: "8 a 26 de julho · 6 viajantes")
                     PreviewDatePicker(selection: $previewDate)
-                    TripCountdownCard()
                     EmptyStateCard(icon: "suitcase.rolling.fill", title: "A aventura está chegando", message: "Cada detalhe preparado agora vira uma memória inesquecível depois. Use a prévia abaixo para explorar a viagem.")
                 }
             }
@@ -69,6 +70,138 @@ struct TodayView: View {
                 previewDate = Date()
             }
         }
+    }
+}
+
+private struct NowModeCard: View {
+    @EnvironmentObject private var weather: WeatherStore
+
+    var body: some View {
+        TimelineView(.periodic(from: .now, by: 60)) { context in
+            momentContent(NowModePlanner.moment(at: context.date))
+        }
+    }
+
+    @ViewBuilder
+    private func momentContent(_ moment: LiveTripMoment) -> some View {
+        if let entry = moment.entry {
+                let destination = ExpectedClimate.forDay(entry.day)?.city ?? entry.day.city
+                let outfit = OutfitRecommendation.forActivity(entry.activity, city: entry.day.city)
+                VStack(alignment: .leading, spacing: 15) {
+                    HStack {
+                        Label(phaseTitle(moment.phase), systemImage: phaseSymbol(moment.phase))
+                            .font(.caption.bold()).tracking(0.9)
+                        Spacer()
+                        if let countdown = moment.countdown {
+                            Text(countdownText(countdown))
+                                .font(.caption.bold().monospacedDigit())
+                        } else if moment.phase == .happening {
+                            Text("AGORA")
+                                .font(.caption2.weight(.black))
+                                .padding(.horizontal, 9).padding(.vertical, 5)
+                                .background(.white.opacity(0.18), in: Capsule())
+                        }
+                    }
+                    .foregroundStyle(.white.opacity(0.9))
+
+                    VStack(alignment: .leading, spacing: 5) {
+                        Text(entry.activity.title)
+                            .font(.title2.bold())
+                        Text("\(entry.day.title) · \(entry.activity.time)")
+                            .font(.subheadline)
+                            .foregroundStyle(.white.opacity(0.82))
+                    }
+                    .foregroundStyle(.white)
+
+                    HStack(spacing: 8) {
+                        infoPill(symbol: "calendar", text: entry.date.formatted(.dateTime.day().month(.abbreviated).hour().minute().locale(Locale(identifier: "pt_BR"))))
+                        if let snapshot = weather.snapshots[destination] {
+                            infoPill(symbol: WeatherCondition.from(code: snapshot.current.weatherCode).symbol, text: String(format: "%.0f°", snapshot.current.temperature))
+                        } else if let climate = ExpectedClimate.forDay(entry.day) {
+                            infoPill(symbol: "thermometer.medium", text: "\(climate.minimum)°–\(climate.maximum)°")
+                        }
+                    }
+
+                    Label(outfit.shared.prefix(2).joined(separator: " · "), systemImage: "tshirt.fill")
+                        .font(.caption)
+                        .foregroundStyle(.white.opacity(0.86))
+
+                    HStack(spacing: 10) {
+                        NavigationLink {
+                            ActivityDetailView(activity: entry.activity, city: entry.day.city)
+                        } label: {
+                            Label("Abrir atividade", systemImage: "arrow.right.circle.fill")
+                                .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .tint(.white)
+                        .foregroundStyle(.indigo)
+
+                        if let query = entry.activity.locationQuery,
+                           let encoded = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
+                           let url = URL(string: "https://maps.apple.com/?q=\(encoded)") {
+                            Link(destination: url) {
+                                Image(systemName: "map.fill")
+                                    .frame(width: 42, height: 34)
+                            }
+                            .buttonStyle(.bordered)
+                            .tint(.white)
+                            .accessibilityLabel("Abrir rota")
+                        }
+                    }
+                }
+                .padding(20)
+                .background(
+                    LinearGradient(
+                        colors: [.indigo, destination.color.opacity(0.9), .purple.opacity(0.86)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    in: RoundedRectangle(cornerRadius: 27)
+                )
+                .shadow(color: .indigo.opacity(0.22), radius: 16, y: 8)
+                .task {
+                    if let location = WeatherLocation.location(for: destination) {
+                        await weather.refresh(location)
+                    }
+                }
+        }
+    }
+
+    private func infoPill(symbol: String, text: String) -> some View {
+        Label(text, systemImage: symbol)
+            .font(.caption.bold())
+            .foregroundStyle(.white)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 7)
+            .background(.white.opacity(0.14), in: Capsule())
+    }
+
+    private func phaseTitle(_ phase: LiveTripMoment.Phase) -> String {
+        switch phase {
+        case .beforeTrip: "MODO AGORA · PRIMEIRO PASSO"
+        case .happening: "MODO AGORA · EM CURSO"
+        case .upcoming: "MODO AGORA · PRÓXIMO PASSO"
+        case .completed: "MODO AGORA · VIAGEM CONCLUÍDA"
+        }
+    }
+
+    private func phaseSymbol(_ phase: LiveTripMoment.Phase) -> String {
+        switch phase {
+        case .beforeTrip: "airplane.departure"
+        case .happening: "location.fill"
+        case .upcoming: "clock.fill"
+        case .completed: "checkmark.circle.fill"
+        }
+    }
+
+    private func countdownText(_ interval: TimeInterval) -> String {
+        let minutes = max(0, Int(interval) / 60)
+        let days = minutes / 1_440
+        let hours = (minutes % 1_440) / 60
+        if days > 0 { return "FALTAM \(days)d \(hours)h" }
+        if hours > 0 { return "FALTAM \(hours)h \(minutes % 60)min" }
+        return "FALTAM \(minutes)min"
     }
 }
 
@@ -126,40 +259,44 @@ private struct TripCountdownCard: View {
 
     var body: some View {
         TimelineView(.periodic(from: .now, by: 1)) { context in
-            let remaining = max(0, departure.timeIntervalSince(context.date))
-            let days = Int(remaining) / 86_400
-            let hours = (Int(remaining) % 86_400) / 3_600
-            let minutes = (Int(remaining) % 3_600) / 60
-            let seconds = Int(remaining) % 60
+            if context.date < departure {
+                countdownContent(remaining: departure.timeIntervalSince(context.date))
+            }
+        }
+    }
 
-            VStack(spacing: 18) {
+    private func countdownContent(remaining: TimeInterval) -> some View {
+        let days = Int(remaining) / 86_400
+        let hours = (Int(remaining) % 86_400) / 3_600
+        let minutes = (Int(remaining) % 3_600) / 60
+        let seconds = Int(remaining) % 60
+
+        return VStack(spacing: 18) {
                 HStack {
                     VStack(alignment: .leading, spacing: 4) {
-                        Text(remaining > 0 ? "A CONTAGEM REGRESSIVA COMEÇOU" : "A VIAGEM COMEÇOU")
+                        Text("A CONTAGEM REGRESSIVA COMEÇOU")
                             .font(.caption.weight(.black))
                             .tracking(1.1)
                             .foregroundStyle(.white.opacity(0.82))
-                        Text(remaining > 0 ? countdownMessage(days: days) : "É hora de viver esta história!")
+                        Text(countdownMessage(days: days))
                             .font(.title3.bold())
                             .foregroundStyle(.white)
                     }
                     Spacer()
-                    Image(systemName: remaining > 0 ? "airplane.departure" : "sparkles")
+                    Image(systemName: "airplane.departure")
                         .font(.system(size: 31))
                         .foregroundStyle(.white)
                         .symbolEffect(.pulse, options: .repeating.speed(0.35))
                 }
 
-                if remaining > 0 {
-                    HStack(spacing: 8) {
-                        CountdownUnit(value: days, label: "DIAS")
-                        separator
-                        CountdownUnit(value: hours, label: "HORAS")
-                        separator
-                        CountdownUnit(value: minutes, label: "MIN")
-                        separator
-                        CountdownUnit(value: seconds, label: "SEG")
-                    }
+                HStack(spacing: 8) {
+                    CountdownUnit(value: days, label: "DIAS")
+                    separator
+                    CountdownUnit(value: hours, label: "HORAS")
+                    separator
+                    CountdownUnit(value: minutes, label: "MIN")
+                    separator
+                    CountdownUnit(value: seconds, label: "SEG")
                 }
 
                 HStack(spacing: 7) {
@@ -193,8 +330,7 @@ private struct TripCountdownCard: View {
             .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
             .shadow(color: .pink.opacity(0.28), radius: 20, y: 10)
             .accessibilityElement(children: .ignore)
-            .accessibilityLabel(remaining > 0 ? "Faltam \(days) dias, \(hours) horas, \(minutes) minutos e \(seconds) segundos para a viagem" : "A viagem começou")
-        }
+            .accessibilityLabel("Faltam \(days) dias, \(hours) horas, \(minutes) minutos e \(seconds) segundos para a viagem")
     }
 
     private var separator: some View {
@@ -272,6 +408,7 @@ private struct PreviewDatePicker: View {
 }
 
 struct ActivityRow: View {
+    @EnvironmentObject private var ratings: ActivityRatingStore
     let activity: TripActivity
     let city: City
     let color: Color
@@ -301,6 +438,15 @@ struct ActivityRow: View {
                     }
                     Text(activity.title).font(.headline).foregroundStyle(.primary)
                     Text(activity.details).font(.subheadline).foregroundStyle(.secondary)
+                    if let summary = ratings.summary(for: activity.id) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "star.fill")
+                            Text(summary.average.formatted(.number.precision(.fractionLength(1))))
+                            Text("· \(summary.count)")
+                        }
+                        .font(.caption.bold())
+                        .foregroundStyle(.orange)
+                    }
                     Label("Ver detalhes", systemImage: "chevron.right.circle.fill")
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(color)
@@ -399,14 +545,19 @@ private struct ActivityGuide {
 }
 
 private struct ActivityDetailView: View {
+    @EnvironmentObject private var ratings: ActivityRatingStore
+    @EnvironmentObject private var authentication: AuthenticationManager
     let activity: TripActivity
     let city: City
     private var guide: ActivityGuide { .guide(for: activity, city: city) }
+    private var outfit: OutfitRecommendation { .forActivity(activity, city: city) }
 
     var body: some View {
         ScrollView {
             VStack(spacing: 18) {
                 hero
+                ratingCard
+                outfitCard
                 card(title: "O QUE ESPERAR", symbol: "sparkles", text: guide.about)
                 listCard(title: "DESTAQUES", symbol: "star.fill", items: guide.highlights)
                 listCard(title: "RECOMENDAÇÕES", symbol: "lightbulb.fill", items: guide.recommendations)
@@ -417,6 +568,89 @@ private struct ActivityDetailView: View {
         .background(Color(.systemGroupedBackground))
         .navigationTitle(activity.title)
         .navigationBarTitleDisplayMode(.inline)
+        .task { await ratings.sync(authentication: authentication) }
+        .alert("Avaliação", isPresented: Binding(
+            get: { ratings.errorMessage != nil },
+            set: { if !$0 { ratings.errorMessage = nil } }
+        )) {
+            Button("OK") { ratings.errorMessage = nil }
+        } message: {
+            Text(ratings.errorMessage ?? "")
+        }
+    }
+
+    private var ratingCard: some View {
+        let ownRating = ratings.rating(for: activity.id, email: authentication.authenticatedEmail)
+        let summary = ratings.summary(for: activity.id)
+        return VStack(spacing: 13) {
+            VStack(spacing: 4) {
+                Text("A TUA AVALIAÇÃO")
+                    .font(.caption.bold()).tracking(0.8).foregroundStyle(.secondary)
+                Text(ownRating == nil ? "Gostaste desta atividade?" : "Avaliação guardada")
+                    .font(.headline)
+            }
+            HStack(spacing: 10) {
+                ForEach(1...5, id: \.self) { star in
+                    Button {
+                        Task { await ratings.rate(activity: activity, stars: star, authentication: authentication) }
+                    } label: {
+                        Image(systemName: star <= (ownRating ?? 0) ? "star.fill" : "star")
+                            .font(.title2)
+                            .foregroundStyle(.orange)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("\(star) \(star == 1 ? "estrela" : "estrelas")")
+                }
+            }
+            if let summary {
+                Text("Média do grupo: \(summary.average.formatted(.number.precision(.fractionLength(1)))) · \(summary.count) \(summary.count == 1 ? "avaliação" : "avaliações")")
+                    .font(.caption).foregroundStyle(.secondary)
+            } else {
+                Text("Sê a primeira pessoa a avaliar.")
+                    .font(.caption).foregroundStyle(.secondary)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .padding()
+        .background(.orange.opacity(0.08), in: RoundedRectangle(cornerRadius: 20))
+    }
+
+    private var outfitCard: some View {
+        VStack(alignment: .leading, spacing: 15) {
+            Label("VESTUÁRIO RECOMENDADO", systemImage: "tshirt.fill")
+                .font(.caption.bold()).tracking(0.8).foregroundStyle(city.color)
+
+            Label(outfit.climateSummary, systemImage: "thermometer.medium")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            Divider()
+            outfitGroup(title: "Meninos", symbol: "person.fill", color: .blue, items: outfit.boys)
+            Divider()
+            outfitGroup(title: "Meninas", symbol: "person.fill", color: .pink, items: outfit.girls)
+            Divider()
+            outfitGroup(title: "Para todos", symbol: "backpack.fill", color: .orange, items: outfit.shared)
+
+            Text("Sugestão baseada na média climática esperada e no tipo de atividade. Confirme o clima real no próprio dia.")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding()
+        .background(.background, in: RoundedRectangle(cornerRadius: 20))
+    }
+
+    private func outfitGroup(title: String, symbol: String, color: Color, items: [String]) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Label(title, systemImage: symbol)
+                .font(.subheadline.bold())
+                .foregroundStyle(color)
+            ForEach(items, id: \.self) { item in
+                Label(item, systemImage: "checkmark.circle.fill")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
     }
 
     private var hero: some View {

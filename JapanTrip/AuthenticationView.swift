@@ -29,8 +29,8 @@ final class AuthenticationManager: ObservableObject {
         self.now = now
         authenticatedEmail = nil
         currentSession = sessionStore.load()
-        let email = currentSession?.user.email?.lowercased()
-        if let email, TripParticipant.participant(for: email) != nil {
+        let email = currentSession?.user.email.map(TripParticipant.normalizedEmail)
+        if let email, !email.isEmpty {
             authenticatedEmail = email
             trustedUntil = sessionStore.loadTrustedUntil()
             if hasValidTrustedSession {
@@ -50,7 +50,9 @@ final class AuthenticationManager: ObservableObject {
         canUseBiometrics && !hasValidTrustedSession && !isAuthenticated && !isAuthenticating
     }
     var authenticatedName: String? {
-        authenticatedEmail.flatMap { TripParticipant.participant(for: $0)?.name }
+        guard let email = authenticatedEmail else { return nil }
+        return TripParticipant.participant(for: email)?.name
+            ?? email.split(separator: "@").first.map(String.init)
     }
     var authenticatedUserID: UUID? { currentSession?.user.id }
 
@@ -143,20 +145,15 @@ final class AuthenticationManager: ObservableObject {
         isAuthenticating = true
         defer { isAuthenticating = false }
         errorMessage = nil
-        let normalizedEmail = email.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        guard TripParticipant.participant(for: normalizedEmail) != nil else {
-            errorMessage = SupabaseAuthError.unauthorizedUser.localizedDescription
-            return false
-        }
+        let normalizedEmail = TripParticipant.normalizedEmail(email)
 
         do {
             let session = try await authService.signIn(email: normalizedEmail, password: password)
-            guard session.user.email?.lowercased() == normalizedEmail else {
-                throw SupabaseAuthError.unauthorizedUser
-            }
+            guard let sessionEmail = session.user.email.map(TripParticipant.normalizedEmail),
+                  !sessionEmail.isEmpty else { throw SupabaseAuthError.invalidResponse }
             try sessionStore.save(session)
             currentSession = session
-            authenticatedEmail = normalizedEmail
+            authenticatedEmail = sessionEmail
             isAuthenticated = true
             extendTrustedSession()
             return true
@@ -184,6 +181,44 @@ final class AuthenticationManager: ObservableObject {
         if let accessToken {
             Task { await authService.signOut(accessToken: accessToken) }
         }
+    }
+
+    @discardableResult
+    func changePassword(currentPassword: String, newPassword: String, confirmation: String) async -> Bool {
+        guard !isAuthenticating else { return false }
+        guard let email = authenticatedEmail else {
+            errorMessage = "Sessão inválida. Entre novamente."
+            return false
+        }
+        guard newPassword.count >= 6 else {
+            errorMessage = "A nova senha deve ter pelo menos 6 caracteres."
+            return false
+        }
+        guard newPassword == confirmation else {
+            errorMessage = "A confirmação não corresponde à nova senha."
+            return false
+        }
+        guard currentPassword != newPassword else {
+            errorMessage = "Escolha uma senha diferente da atual."
+            return false
+        }
+
+        isAuthenticating = true
+        defer { isAuthenticating = false }
+        errorMessage = nil
+        do {
+            let freshSession = try await authService.signIn(email: email, password: currentPassword)
+            try await authService.updatePassword(newPassword, accessToken: freshSession.accessToken)
+            try sessionStore.save(freshSession)
+            currentSession = freshSession
+            extendTrustedSession()
+            return true
+        } catch let error as SupabaseAuthError {
+            errorMessage = error.localizedDescription
+        } catch {
+            errorMessage = "Não foi possível alterar a senha. Verifique a ligação."
+        }
+        return false
     }
 
     func lockIfAllowed() {
@@ -215,9 +250,8 @@ final class AuthenticationManager: ObservableObject {
             throw SupabaseAuthError.invalidCredentials
         }
         let session = try await authService.refreshSession(refreshToken: refreshToken)
-        guard let email = session.user.email?.lowercased(), TripParticipant.participant(for: email) != nil else {
-            throw SupabaseAuthError.unauthorizedUser
-        }
+        guard let email = session.user.email.map(TripParticipant.normalizedEmail),
+              !email.isEmpty else { throw SupabaseAuthError.invalidResponse }
         try sessionStore.save(session)
         currentSession = session
         authenticatedEmail = email
@@ -394,6 +428,75 @@ private struct AuthenticationView: View {
                 password = ""
                 focusedField = .password
             }
+        }
+    }
+}
+
+struct ChangePasswordView: View {
+    @EnvironmentObject private var authentication: AuthenticationManager
+    @Environment(\.dismiss) private var dismiss
+    @State private var currentPassword = ""
+    @State private var newPassword = ""
+    @State private var confirmation = ""
+    @State private var didChangePassword = false
+
+    var body: some View {
+        Form {
+            Section {
+                Label(authentication.authenticatedEmail ?? "Utilizador autenticado", systemImage: "person.crop.circle.fill")
+                    .foregroundStyle(.secondary)
+            }
+            Section("Confirmar identidade") {
+                SecureField("Senha atual", text: $currentPassword)
+                    .textContentType(.password)
+            }
+            Section("Nova senha") {
+                SecureField("Nova senha", text: $newPassword)
+                    .textContentType(.newPassword)
+                SecureField("Confirmar nova senha", text: $confirmation)
+                    .textContentType(.newPassword)
+                Text("Use pelo menos 6 caracteres. A senha fica armazenada apenas no Supabase e nunca no app.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            if let error = authentication.errorMessage {
+                Section {
+                    Label(error, systemImage: "exclamationmark.triangle.fill")
+                        .font(.footnote)
+                        .foregroundStyle(.orange)
+                }
+            }
+        }
+        .navigationTitle("Alterar senha")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .cancellationAction) { Button("Cancelar") { dismiss() } }
+            ToolbarItem(placement: .confirmationAction) {
+                Button("Guardar") {
+                    Task {
+                        if await authentication.changePassword(
+                            currentPassword: currentPassword,
+                            newPassword: newPassword,
+                            confirmation: confirmation
+                        ) {
+                            didChangePassword = true
+                        }
+                    }
+                }
+                .disabled(authentication.isAuthenticating || currentPassword.isEmpty || newPassword.isEmpty || confirmation.isEmpty)
+            }
+        }
+        .overlay {
+            if authentication.isAuthenticating {
+                ProgressView("A alterar senha…")
+                    .padding()
+                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
+            }
+        }
+        .alert("Senha alterada", isPresented: $didChangePassword) {
+            Button("OK") { dismiss() }
+        } message: {
+            Text("A nova senha já pode ser usada no próximo acesso.")
         }
     }
 }

@@ -1,7 +1,7 @@
 import SwiftUI
 
 enum AppTab: Hashable {
-    case today, itinerary, reservations, checklist
+    case today, itinerary, reservations, checklist, more
 }
 
 @MainActor
@@ -18,6 +18,8 @@ final class AppNavigationState: ObservableObject {
     @Published var showsLocationSharing = false
     @Published var showsExpenses = false
     @Published var showsShopping = false
+    @Published var showsPersonalDiary = false
+    @Published var showsChangePassword = false
     @Published private(set) var homeRequestID = 0
 
     func goHome() {
@@ -32,6 +34,8 @@ final class AppNavigationState: ObservableObject {
         showsLocationSharing = false
         showsExpenses = false
         showsShopping = false
+        showsPersonalDiary = false
+        showsChangePassword = false
         selectedTab = .today
         homeRequestID += 1
     }
@@ -57,6 +61,10 @@ struct RootView: View {
             NavigationStack { ChecklistView().appMenuToolbar() }
                 .tabItem { Label("Checklist", systemImage: "checklist") }
                 .tag(AppTab.checklist)
+
+            NavigationStack { FeatureHubView() }
+                .tabItem { Label("Mais", systemImage: "square.grid.2x2.fill") }
+                .tag(AppTab.more)
         }
         .tint(.indigo)
         .sheet(isPresented: $navigation.showsMobility) {
@@ -103,107 +111,28 @@ struct RootView: View {
             NavigationStack { ShoppingView() }
                 .environmentObject(navigation)
         }
+        .sheet(isPresented: $navigation.showsPersonalDiary) {
+            NavigationStack { PersonalDiaryView() }
+                .environmentObject(navigation)
+        }
+        .sheet(isPresented: $navigation.showsChangePassword) {
+            NavigationStack { ChangePasswordView() }
+        }
     }
 }
 
 private struct AppMenuToolbarModifier: ViewModifier {
     @EnvironmentObject private var navigation: AppNavigationState
-    @EnvironmentObject private var authentication: AuthenticationManager
-    @EnvironmentObject private var locationSharing: LocationSharingManager
 
     func body(content: Content) -> some View {
         content.toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                Menu {
-                    Button {
-                        navigation.goHome()
-                    } label: {
-                        Label("Tela inicial", systemImage: "house.fill")
-                    }
-                    Button {
-                        navigation.showsMobility = true
-                    } label: {
-                        Label("Mobilidade", systemImage: "tram.fill")
-                    }
-                    Button {
-                        navigation.showsFlights = true
-                    } label: {
-                        Label("Voos", systemImage: "airplane")
-                    }
-                    Button {
-                        navigation.showsHotels = true
-                    } label: {
-                        Label("Hotéis", systemImage: "bed.double.fill")
-                    }
-                    Button {
-                        navigation.showsOffline = true
-                    } label: {
-                        Label("Modo Offline", systemImage: "icloud.and.arrow.down.fill")
-                    }
-                    Button {
-                        navigation.showsNotifications = true
-                    } label: {
-                        Label("Notificações", systemImage: "bell.badge.fill")
-                    }
-                    Button {
-                        navigation.showsDocumentVault = true
-                    } label: {
-                        Label("Cofre de documentos", systemImage: "lock.doc.fill")
-                    }
-                    Button {
-                        navigation.showsLocationSharing = true
-                    } label: {
-                        Label("Localização do grupo", systemImage: "location.fill.viewfinder")
-                    }
-                    Button {
-                        navigation.showsExpenses = true
-                    } label: {
-                        Label("Despesas", systemImage: "wallet.bifold.fill")
-                    }
-                    Button {
-                        navigation.showsShopping = true
-                    } label: {
-                        Label("Compras", systemImage: "cart.fill")
-                    }
-                    Button {
-                        navigation.showsPhotos = true
-                    } label: {
-                        Label("Fotos", systemImage: "photo.on.rectangle.angled")
-                    }
-                    Divider()
-                    Button {
-                        navigation.selectedTab = .itinerary
-                    } label: {
-                        Label("Roteiro", systemImage: "map.fill")
-                    }
-                    Button {
-                        navigation.showsWeather = true
-                    } label: {
-                        Label("Clima", systemImage: "cloud.sun.fill")
-                    }
-                    Button {
-                        navigation.selectedTab = .reservations
-                    } label: {
-                        Label("Reservas", systemImage: "ticket.fill")
-                    }
-                    Button {
-                        navigation.selectedTab = .checklist
-                    } label: {
-                        Label("Checklist", systemImage: "checklist")
-                    }
-                    Divider()
-                    Button(role: .destructive) {
-                        Task {
-                            await locationSharing.setSharing(false, authentication: authentication)
-                            authentication.signOut()
-                        }
-                    } label: {
-                        Label("Terminar sessão", systemImage: "rectangle.portrait.and.arrow.right")
-                    }
+                Button {
+                    navigation.selectedTab = .more
                 } label: {
-                    Image(systemName: "line.3.horizontal.circle.fill")
+                    Image(systemName: "square.grid.2x2.fill")
                         .font(.title3)
-                        .accessibilityLabel("Menu principal")
+                        .accessibilityLabel("Todas as funcionalidades")
                 }
             }
         }

@@ -54,6 +54,10 @@ Cada participante pode ativar ou desligar voluntariamente a partilha de localiza
 
 As despesas e fotografias também podem ser partilhadas entre os participantes, mantendo cópias locais para funcionamento offline. Execute `supabase/trip_sharing.sql` no SQL Editor do Supabase para criar as tabelas, o bucket privado de fotografias e as respetivas políticas RLS. As fotos só podem ser alteradas ou eliminadas pelo participante que as publicou.
 
+A checklist está dividida em Geral e Pessoal. A lista Geral e as suas marcações são partilhadas pelo grupo; a lista Pessoal é isolada por conta através de RLS. Execute `supabase/checklist_sharing.sql` no SQL Editor antes de usar a sincronização.
+
+Cada participante pode avaliar as atividades de 1 a 5 estrelas. As avaliações formam um ranking coletivo, mas cada utilizador só pode criar ou alterar a sua própria nota. Execute `supabase/activity_ratings.sql` no SQL Editor para criar a tabela e as políticas RLS.
+
 ## Despesas
 
 O módulo de despesas regista valores em BRL, AED e JPY, converte automaticamente com taxas Frankfurter guardadas para uso offline, acompanha o orçamento diário do grupo e divide cada lançamento entre participantes selecionados. Os saldos indicam quanto cada pessoa deve ou tem a receber. Os lançamentos ficam protegidos localmente pelo sistema de proteção de ficheiros do iOS.

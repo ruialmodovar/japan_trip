@@ -268,6 +268,10 @@ struct PhotoJournalView: View {
     @State private var selectedEntry: PhotoJournalEntry?
     @State private var showsCamera = false
     @State private var showsPhotoLibrary = false
+    @State private var isSelecting = false
+    @State private var selectedPhotoIDs: Set<UUID> = []
+    @State private var showsShareSheet = false
+    @State private var confirmsBatchDeletion = false
 
     private let columns = [GridItem(.flexible(), spacing: 3), GridItem(.flexible(), spacing: 3), GridItem(.flexible(), spacing: 3)]
 
@@ -292,6 +296,13 @@ struct PhotoJournalView: View {
                 }
             }
             ToolbarItemGroup(placement: .topBarTrailing) {
+                if !journal.entries.isEmpty {
+                    Button(isSelecting ? "Cancelar" : "Selecionar") {
+                        isSelecting.toggle()
+                        if !isSelecting { selectedPhotoIDs.removeAll() }
+                    }
+                }
+                if !isSelecting {
                 Button {
                     Task { await journal.sync(authentication: authentication) }
                 } label: {
@@ -309,7 +320,7 @@ struct PhotoJournalView: View {
                 } label: {
                     Image(systemName: "plus.circle.fill").accessibilityLabel("Adicionar fotografias")
                 }
-                Button("Fechar") { dismiss() }
+                }
             }
         }
         .onChange(of: selectedItems) { _, items in
@@ -332,6 +343,9 @@ struct PhotoJournalView: View {
             PhotoDetailView(entry: entry)
                 .environmentObject(journal)
         }
+        .sheet(isPresented: $showsShareSheet) {
+            ActivityShareSheet(items: selectedImages)
+        }
         .fullScreenCover(isPresented: $showsCamera) {
             CameraCaptureView { image in
                 Task { await journal.saveCapturedImage(image) }
@@ -343,6 +357,11 @@ struct PhotoJournalView: View {
                 ProgressView(journal.isSyncing ? "A sincronizar fotografias…" : "A guardar fotografias…")
                     .padding(22)
                     .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 18))
+            }
+        }
+        .safeAreaInset(edge: .bottom) {
+            if isSelecting {
+                selectionBar
             }
         }
         .onDisappear {
@@ -357,6 +376,20 @@ struct PhotoJournalView: View {
             Button("OK") { journal.errorMessage = nil }
         } message: {
             Text(journal.errorMessage ?? "")
+        }
+        .confirmationDialog(
+            "Apagar \(deletableEntries.count) fotografia(s)?",
+            isPresented: $confirmsBatchDeletion,
+            titleVisibility: .visible
+        ) {
+            Button("Apagar fotografias", role: .destructive) {
+                deletableEntries.forEach(journal.delete)
+                selectedPhotoIDs.removeAll()
+                isSelecting = false
+            }
+            Button("Cancelar", role: .cancel) {}
+        } message: {
+            Text("Só serão apagadas as fotografias que pertencem à tua conta. Esta ação não pode ser desfeita.")
         }
     }
 
@@ -413,10 +446,27 @@ struct PhotoJournalView: View {
                 LazyVGrid(columns: columns, spacing: 3) {
                     ForEach(journal.entries) { entry in
                         Button {
-                            selectedEntry = entry
+                            if isSelecting {
+                                toggleSelection(entry)
+                            } else {
+                                selectedEntry = entry
+                            }
                         } label: {
                             JournalThumbnail(entry: entry)
                                 .environmentObject(journal)
+                                .overlay(alignment: .topTrailing) {
+                                    if isSelecting {
+                                        Image(systemName: selectedPhotoIDs.contains(entry.id) ? "checkmark.circle.fill" : "circle")
+                                            .font(.title2)
+                                            .foregroundStyle(selectedPhotoIDs.contains(entry.id) ? .white : .white.opacity(0.9))
+                                            .background(selectedPhotoIDs.contains(entry.id) ? Color.indigo : Color.black.opacity(0.28), in: Circle())
+                                            .padding(7)
+                                            .shadow(radius: 2)
+                                    }
+                                }
+                                .overlay {
+                                    if selectedPhotoIDs.contains(entry.id) { Color.indigo.opacity(0.18) }
+                                }
                         }
                         .buttonStyle(.plain)
                         .contextMenu {
@@ -432,6 +482,59 @@ struct PhotoJournalView: View {
             .padding(.vertical)
         }
     }
+
+    private var selectedEntries: [PhotoJournalEntry] {
+        journal.entries.filter { selectedPhotoIDs.contains($0.id) }
+    }
+
+    private var deletableEntries: [PhotoJournalEntry] {
+        selectedEntries.filter(journal.canModify)
+    }
+
+    private var selectedImages: [UIImage] {
+        selectedEntries.compactMap { UIImage(contentsOfFile: journal.imageURL(for: $0).path) }
+    }
+
+    private var selectionBar: some View {
+        HStack(spacing: 12) {
+            Text("\(selectedPhotoIDs.count) selecionada(s)")
+                .font(.subheadline.bold())
+            Spacer()
+            Button {
+                showsShareSheet = true
+            } label: {
+                Label("Enviar", systemImage: "square.and.arrow.up")
+            }
+            .disabled(selectedImages.isEmpty)
+            Button(role: .destructive) {
+                confirmsBatchDeletion = true
+            } label: {
+                Label("Apagar", systemImage: "trash")
+            }
+            .disabled(deletableEntries.isEmpty)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .background(.bar)
+    }
+
+    private func toggleSelection(_ entry: PhotoJournalEntry) {
+        if selectedPhotoIDs.contains(entry.id) {
+            selectedPhotoIDs.remove(entry.id)
+        } else {
+            selectedPhotoIDs.insert(entry.id)
+        }
+    }
+}
+
+private struct ActivityShareSheet: UIViewControllerRepresentable {
+    let items: [UIImage]
+
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        UIActivityViewController(activityItems: items, applicationActivities: nil)
+    }
+
+    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
 }
 
 struct CameraCaptureView: UIViewControllerRepresentable {
