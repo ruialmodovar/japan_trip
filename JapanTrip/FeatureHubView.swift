@@ -21,6 +21,7 @@ struct FeatureHubView: View {
                     FeatureTile(title: "Localização", subtitle: "Encontrar o grupo", symbol: "location.fill.viewfinder", color: .green) { navigation.showsLocationSharing = true }
                     FeatureTile(title: "Despesas", subtitle: "Gastos e divisões", symbol: "wallet.bifold.fill", color: .mint) { navigation.showsExpenses = true }
                     FeatureTile(title: "Compras", subtitle: "Foto e conversão", symbol: "cart.fill", color: .pink) { navigation.showsShopping = true }
+                    FeatureTile(title: "Tradutor de Menu", subtitle: "Japonês para PT", symbol: "text.viewfinder", color: .red) { navigation.showsMenuTranslator = true }
                     FeatureTile(title: "Fotos", subtitle: "Álbum da viagem", symbol: "photo.on.rectangle.angled", color: .purple) { navigation.showsPhotos = true }
                 }
                 featureSection("Memórias pessoais", subtitle: "Conteúdo privado da tua conta") {

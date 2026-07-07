@@ -385,7 +385,7 @@ private struct ShoppingItemDetail: View {
     }
 }
 
-private extension UIImage {
+extension UIImage {
     var cgOrientation: CGImagePropertyOrientation {
         switch imageOrientation {
         case .up: .up; case .down: .down; case .left: .left; case .right: .right

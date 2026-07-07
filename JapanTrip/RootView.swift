@@ -18,6 +18,7 @@ final class AppNavigationState: ObservableObject {
     @Published var showsLocationSharing = false
     @Published var showsExpenses = false
     @Published var showsShopping = false
+    @Published var showsMenuTranslator = false
     @Published var showsPersonalDiary = false
     @Published var showsChangePassword = false
     @Published private(set) var homeRequestID = 0
@@ -34,6 +35,7 @@ final class AppNavigationState: ObservableObject {
         showsLocationSharing = false
         showsExpenses = false
         showsShopping = false
+        showsMenuTranslator = false
         showsPersonalDiary = false
         showsChangePassword = false
         selectedTab = .today
@@ -109,6 +111,10 @@ struct RootView: View {
         }
         .sheet(isPresented: $navigation.showsShopping) {
             NavigationStack { ShoppingView() }
+                .environmentObject(navigation)
+        }
+        .sheet(isPresented: $navigation.showsMenuTranslator) {
+            NavigationStack { MenuTranslatorView() }
                 .environmentObject(navigation)
         }
         .sheet(isPresented: $navigation.showsPersonalDiary) {

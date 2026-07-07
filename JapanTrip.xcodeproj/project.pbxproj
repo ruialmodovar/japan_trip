@@ -39,6 +39,7 @@
 		A10000000000000000000031 /* PersonalDiary.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000031 /* PersonalDiary.swift */; };
 		A10000000000000000000032 /* FeatureHubView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000032 /* FeatureHubView.swift */; };
 		A10000000000000000000033 /* DiaryVoiceAssistant.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000033 /* DiaryVoiceAssistant.swift */; };
+		A10000000000000000000034 /* MenuTranslatorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000000000000000000034 /* MenuTranslatorView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -86,6 +87,7 @@
 		B10000000000000000000031 /* PersonalDiary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PersonalDiary.swift; sourceTree = "<group>"; };
 		B10000000000000000000032 /* FeatureHubView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeatureHubView.swift; sourceTree = "<group>"; };
 		B10000000000000000000033 /* DiaryVoiceAssistant.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiaryVoiceAssistant.swift; sourceTree = "<group>"; };
+		B10000000000000000000034 /* MenuTranslatorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuTranslatorView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -149,6 +151,7 @@
 				B10000000000000000000031 /* PersonalDiary.swift */,
 				B10000000000000000000032 /* FeatureHubView.swift */,
 				B10000000000000000000033 /* DiaryVoiceAssistant.swift */,
+				B10000000000000000000034 /* MenuTranslatorView.swift */,
 			);
 			path = JapanTrip;
 			sourceTree = "<group>";
@@ -299,6 +302,7 @@
 				A10000000000000000000031 /* PersonalDiary.swift in Sources */,
 				A10000000000000000000032 /* FeatureHubView.swift in Sources */,
 				A10000000000000000000033 /* DiaryVoiceAssistant.swift in Sources */,
+				A10000000000000000000034 /* MenuTranslatorView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -372,7 +376,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = "Japão 2026";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.travel";
-				INFOPLIST_KEY_NSCameraUsageDescription = "Use a câmera para registrar e guardar memórias da viagem no diário privado.";
+				INFOPLIST_KEY_NSCameraUsageDescription = "Use a câmera para registrar memórias, traduzir cardápios e converter preços da viagem.";
 				INFOPLIST_KEY_NSFaceIDUsageDescription = "Use o Face ID para proteger o roteiro e as reservas da viagem.";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Partilhe a sua localização aproximada com os participantes da viagem enquanto utiliza o app.";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Use o microfone para ditar memórias no seu diário pessoal.";
@@ -382,7 +386,7 @@
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = UIInterfaceOrientationPortrait;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 1.7;
+				MARKETING_VERSION = 1.8;
 				PRODUCT_BUNDLE_IDENTIFIER = com.ruicoelho;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
@@ -403,7 +407,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = "Japão 2026";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.travel";
-				INFOPLIST_KEY_NSCameraUsageDescription = "Use a câmera para registrar e guardar memórias da viagem no diário privado.";
+				INFOPLIST_KEY_NSCameraUsageDescription = "Use a câmera para registrar memórias, traduzir cardápios e converter preços da viagem.";
 				INFOPLIST_KEY_NSFaceIDUsageDescription = "Use o Face ID para proteger o roteiro e as reservas da viagem.";
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Partilhe a sua localização aproximada com os participantes da viagem enquanto utiliza o app.";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Use o microfone para ditar memórias no seu diário pessoal.";
@@ -413,7 +417,7 @@
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = UIInterfaceOrientationPortrait;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
-				MARKETING_VERSION = 1.7;
+				MARKETING_VERSION = 1.8;
 				PRODUCT_BUNDLE_IDENTIFIER = com.ruicoelho;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
