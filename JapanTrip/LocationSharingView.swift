@@ -34,8 +34,8 @@ private extension ISO8601DateFormatter {
 
 protocol LocationSharingServicing {
     func fetchLocations(accessToken: String) async throws -> [SharedParticipantLocation]
-    func upsertLocation(userID: UUID, email: String, location: CLLocation, accessToken: String) async throws
-    func removeLocation(userID: UUID, accessToken: String) async throws
+    func upsertLocation(location: CLLocation, accessToken: String) async throws
+    func removeOwnLocation(accessToken: String) async throws
 }
 
 struct SupabaseLocationSharingService: LocationSharingServicing {
@@ -57,16 +57,12 @@ struct SupabaseLocationSharingService: LocationSharingServicing {
         return try JSONDecoder().decode([SharedParticipantLocation].self, from: data)
     }
 
-    func upsertLocation(userID: UUID, email: String, location: CLLocation, accessToken: String) async throws {
-        var components = URLComponents(url: projectURL.appending(path: "rest/v1/trip_locations"), resolvingAgainstBaseURL: false)!
-        components.queryItems = [.init(name: "on_conflict", value: "user_id")]
-        var request = authorizedRequest(url: components.url!, accessToken: accessToken)
+    func upsertLocation(location: CLLocation, accessToken: String) async throws {
+        let url = projectURL.appending(path: "rest/v1/rpc/upsert_trip_location")
+        var request = authorizedRequest(url: url, accessToken: accessToken)
         request.httpMethod = "POST"
-        request.setValue("resolution=merge-duplicates,return=minimal", forHTTPHeaderField: "Prefer")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.httpBody = try JSONEncoder().encode(LocationPayload(
-            userID: userID,
-            email: email,
+        request.httpBody = try JSONEncoder().encode(LocationRPCPayload(
             latitude: location.coordinate.latitude,
             longitude: location.coordinate.longitude,
             accuracy: max(0, location.horizontalAccuracy)
@@ -74,12 +70,12 @@ struct SupabaseLocationSharingService: LocationSharingServicing {
         _ = try await perform(request)
     }
 
-    func removeLocation(userID: UUID, accessToken: String) async throws {
-        var components = URLComponents(url: projectURL.appending(path: "rest/v1/trip_locations"), resolvingAgainstBaseURL: false)!
-        components.queryItems = [.init(name: "user_id", value: "eq.\(userID.uuidString)")]
-        var request = authorizedRequest(url: components.url!, accessToken: accessToken)
-        request.httpMethod = "DELETE"
-        request.setValue("return=minimal", forHTTPHeaderField: "Prefer")
+    func removeOwnLocation(accessToken: String) async throws {
+        let url = projectURL.appending(path: "rest/v1/rpc/remove_own_trip_location")
+        var request = authorizedRequest(url: url, accessToken: accessToken)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = Data("{}".utf8)
         _ = try await perform(request)
     }
 
@@ -102,16 +98,15 @@ struct SupabaseLocationSharingService: LocationSharingServicing {
     }
 }
 
-private struct LocationPayload: Encodable {
-    let userID: UUID
-    let email: String
+private struct LocationRPCPayload: Encodable {
     let latitude: Double
     let longitude: Double
     let accuracy: Double
 
     enum CodingKeys: String, CodingKey {
-        case userID = "user_id"
-        case email, latitude, longitude, accuracy
+        case latitude = "latitude_value"
+        case longitude = "longitude_value"
+        case accuracy = "accuracy_value"
     }
 }
 
@@ -272,13 +267,12 @@ final class LocationSharingManager: NSObject, ObservableObject, @preconcurrency 
     }
 
     private func upload(_ location: CLLocation, authentication: AuthenticationManager) async {
-        guard let userID = authentication.authenticatedUserID,
-              let email = authentication.authenticatedEmail else { return }
+        guard authentication.authenticatedUserID != nil else { return }
         isUploading = true
         defer { isUploading = false }
         do {
             let token = try await authentication.accessTokenForAPI()
-            try await service.upsertLocation(userID: userID, email: email, location: location, accessToken: token)
+            try await service.upsertLocation(location: location, accessToken: token)
             lastUploadDate = Date()
             lastUploadedLocation = location
             lastSuccessfulShareAt = Date()
@@ -293,7 +287,7 @@ final class LocationSharingManager: NSObject, ObservableObject, @preconcurrency 
         guard let userID = authentication.authenticatedUserID else { return }
         do {
             let token = try await authentication.accessTokenForAPI()
-            try await service.removeLocation(userID: userID, accessToken: token)
+            try await service.removeOwnLocation(accessToken: token)
             locations.removeAll { $0.userID == userID }
         } catch {
             errorMessage = "A partilha foi desligada no aparelho, mas não foi possível remover o último ponto do servidor. Tente novamente com internet."
@@ -432,7 +426,7 @@ struct LocationSharingView: View {
     }
 
     private var privacyCard: some View {
-        Label("A localização é partilhada apenas com os seis utilizadores autenticados. Não existe rastreamento em segundo plano nesta versão.", systemImage: "hand.raised.fill")
+        Label("A localização é partilhada apenas com utilizadores autenticados no Supabase. Não existe rastreamento em segundo plano nesta versão.", systemImage: "hand.raised.fill")
             .font(.caption).foregroundStyle(.secondary)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding()
